@@ -8,6 +8,9 @@ Two interchangeable rasterizers draw the textured mesh:
 `config.backend` picks one: "auto" (GPU when it works, else CPU), "cpu" or "gpu". A GPU that
 fails to initialize falls back to CPU and reports why in `status()`.
 
+The holo design is the mesh's own wireframe, so it skips the texture and is drawn as vector
+lines on the projected mesh (`draw_holo`).
+
 Privacy: everything drawn here comes from the texture, never from camera pixels. Wrapping
 follows your facial geometry, so it's only used by the decorative `mask` mode.
 """
@@ -220,29 +223,6 @@ def tex_led(theme: Theme, t: float, ex: dict) -> np.ndarray:
 
 
 @lru_cache(maxsize=16)
-def _holo_base(theme: Theme) -> np.ndarray:
-    from n0face.effects.mesh import LINKS, NODES
-
-    m = mesh()
-    lines = np.zeros((TEX, TEX, 3), np.uint8)
-    segs = np.round(m.uv[m.edges] * TEX).astype(np.int32)
-    cv2.polylines(lines, list(segs), False, _dim(theme.primary, 0.7), 1, cv2.LINE_AA)
-    pts = np.round(m.uv * TEX).astype(int)
-    for i, j in LINKS:
-        cv2.line(lines, tuple(pts[i]), tuple(pts[j]), (170, 170, 170), 1, cv2.LINE_AA)
-    for i in NODES:
-        cv2.circle(lines, tuple(pts[i]), 4, theme.accent, -1, cv2.LINE_AA)
-    return cv2.add(np.full((TEX, TEX, 3), (22, 12, 6), np.uint8), _glow(lines, 2.5, 1.0))
-
-
-def tex_holo(theme: Theme, t: float, ex: dict) -> np.ndarray:
-    band = np.zeros((TEX, TEX, 3), np.uint8)
-    y = int((t * 0.45 % 1.0) * TEX)
-    cv2.line(band, (0, y), (TEX, y), theme.primary, 3)
-    return _finish(cv2.add(_holo_base(theme), _glow(band, 4, 1.6)), 255)
-
-
-@lru_cache(maxsize=16)
 def _circuit_base(theme: Theme) -> tuple[np.ndarray, list[np.ndarray]]:
     rng = np.random.default_rng(11)
     region = _face_region()
@@ -352,7 +332,91 @@ def tex_hex(theme: Theme, t: float, ex: dict) -> np.ndarray:
     return _finish(cv2.add(base, _glow(light, 3, 1.3)), 255)
 
 
-DESIGNS = {"led": tex_led, "holo": tex_holo, "circuit": tex_circuit, "hex": tex_hex}
+DESIGNS = {"led": tex_led, "circuit": tex_circuit, "hex": tex_hex}
+
+
+# ---- holo (vector) ----------------------------------------------------------------------
+# The holo design is the face mesh's own wireframe, so it's drawn straight onto the projected
+# mesh instead of through a texture: lines stay crisp at any face size, dense areas (lips,
+# eyes) don't blur into blobs, and edges dim with depth. It's also cheaper than a texture.
+
+HOLO_BASE = np.array([22, 12, 6], np.float64)
+SUB = 2  # sub-pixel bits for line drawing
+_ONE = 1 << SUB
+
+
+@lru_cache(maxsize=1)
+def _holo_geometry():
+    from n0face.effects.mesh import LINKS, NODES
+
+    m = mesh()
+    v = m.uv[m.tris].mean(axis=1)[:, 1]
+    return (v - v.min()) / np.ptp(v), np.array(LINKS), np.array(NODES)
+
+
+def draw_holo(canvas: np.ndarray, pts, normals, near, theme: Theme, t: float) -> None:
+    """Holo wireframe on `canvas` (BGR, or premultiplied BGRA) in place.
+
+    Covers exactly the visible triangles, like the textured rasterizers: an opaque dark,
+    lit surface with the mesh lines and their glow on top, all clipped to that surface.
+    """
+    m = mesh()
+    h, w = canvas.shape[:2]
+    order, tn = _visible(m.tris, normals, near)
+    if len(order) == 0:
+        return
+    tri_pts = pts[m.tris[order]]
+    roi = _roi(tri_pts.reshape(-1, 2), h, w)
+    if roi is None:
+        return
+    x0, y0, x1, y1 = roi
+    rh, rw = y1 - y0, x1 - x0
+    local = pts[:468] - (x0, y0)
+
+    # Surface: same lighting as the textured masks, plus a scan band sweeping down the face.
+    # Painter's order, fully opaque.
+    scan_v, links, nodes = _holo_geometry()
+    scan = np.clip(1 - np.abs(scan_v[order] - (t * 0.45 % 1.0)) / 0.05, 0, 1)
+    n = tn[order] / np.maximum(np.linalg.norm(tn[order], axis=1, keepdims=True), 1e-9)
+    shade = 0.38 + 0.62 * np.clip(n @ LIGHT, 0, 1)
+    rim = np.clip(1 - n[:, 2], 0, 1) ** 2 * 0.9
+    colors = np.minimum(HOLO_BASE * shade[:, None] + np.array(theme.primary) * (rim + 0.4 * scan)[:, None], 255)
+    colors[:, 0] = np.maximum(colors[:, 0], 1)  # blue > 0 marks covered pixels
+    surf = np.zeros((rh, rw, 3), np.uint8)
+    fill = cv2.fillConvexPoly
+    for tri, color in zip(np.round(tri_pts - (x0, y0)).astype(np.int32), colors.astype(np.int32).tolist()):
+        fill(surf, tri, color)
+    cover = cv2.extractChannel(surf, 0)
+
+    # Lines: mesh edges dimmer with depth, then the constellation links and nodes. Each is
+    # drawn crisp onto the surface and again, cheaply, into a half-size layer that is blurred
+    # into the glow (shift + 1 halves the fixed-point coordinates).
+    vis = normals[:468, 2] > 0.0
+    p = np.round(local * _ONE).astype(np.int32)
+    small = np.zeros(((rh + 1) // 2, (rw + 1) // 2, 3), np.uint8)
+    edges = m.edges
+    ok = vis[edges].all(axis=1)
+    depth = near[edges].mean(axis=1)
+    lo, hi = (depth[ok].min(), depth[ok].max()) if ok.any() else (0.0, 1.0)
+    band = np.minimum(((depth - lo) / max(hi - lo, 1e-9) * 4).astype(int), 3)
+    segs = p[edges]
+    links = links[vis[links].all(axis=1)]
+    batches = [(segs[ok & (band == b)], _dim(theme.primary, 0.3 + 0.2 * b)) for b in range(4)]
+    batches.append((p[links], (170, 170, 170)))
+    r = max(2, round(rw / 110)) * _ONE
+    centers = [tuple(c) for c in p[nodes[vis[nodes]]].tolist()]
+    for img, shift, kind in ((surf, SUB, cv2.LINE_AA), (small, SUB + 1, cv2.LINE_8)):
+        for lines, color in batches:
+            if len(lines):
+                cv2.polylines(img, lines, False, color, 1, kind, shift)
+        for c in centers:
+            cv2.circle(img, c, r, theme.accent, -1, kind, shift)
+
+    glow = cv2.resize(cv2.GaussianBlur(small, (0, 0), max(rw / 300, 1.0)), (rw, rh), interpolation=cv2.INTER_LINEAR)
+    out = cv2.addWeighted(surf, 1.0, glow, 0.6, 0)
+    if canvas.shape[2] == 4:
+        out = cv2.cvtColor(out, cv2.COLOR_BGR2BGRA)  # opaque, so premultiplied as is
+    cv2.copyTo(out, cover, canvas[y0:y1, x0:x1])
 
 
 # ---- rasterizers ------------------------------------------------------------------------
@@ -595,9 +659,7 @@ def flat_points(lm: np.ndarray) -> np.ndarray:
 
 
 def draw_face(canvas: np.ndarray, lm: np.ndarray, design: str, theme: Theme, t: float, wrapped: bool) -> None:
-    """Draw one face's mask texture onto `canvas` (in place), wrapped or flat."""
-    m = mesh()
-    texture = DESIGNS[design](theme, t, expression(lm))
+    """Draw one face's mask onto `canvas` (in place), wrapped or flat."""
     if wrapped:
         normals, near = face_pose(lm)
         pts = lm[:468, :2].astype(np.float64)
@@ -605,4 +667,14 @@ def draw_face(canvas: np.ndarray, lm: np.ndarray, design: str, theme: Theme, t: 
         pts = flat_points(lm)
         normals = np.tile([0.0, 0.0, 1.0], (468, 1))
         near = np.zeros(468)
+    draw_design(canvas, pts, normals, near, design, theme, t, lambda: expression(lm))
+
+
+def draw_design(canvas, pts, normals, near, design: str, theme: Theme, t: float, ex) -> None:
+    """One design on a projected face mesh. `ex` returns the expression, if the design needs it."""
+    if design == "holo":
+        draw_holo(canvas, pts, normals, near, theme, t)
+        return
+    m = mesh()
+    texture = DESIGNS[design](theme, t, ex())
     rasterizer().draw(canvas, pts, m.uv, normals, near, m.tris, texture, theme.primary)

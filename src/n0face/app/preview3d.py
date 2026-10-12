@@ -349,7 +349,6 @@ class MaskScene:
         from n0face import wrap
 
         m = wrap.mesh()
-        texture = wrap.DESIGNS[design](theme, t, wrap.animated_expression(t))
         if wrap.config.enabled:
             pts, near = p2, pr[:, 2]
             normals = m.normals @ r.T
@@ -359,7 +358,7 @@ class MaskScene:
             card_r, card_2d = project_points(card, r, w, h, k)
             pts, near = card_2d - shift, card_r[:, 2]
             normals = np.tile(np.array([0.0, 0.0, 1.0]) @ r.T, (len(card), 1))
-        wrap.rasterizer().draw(panel, pts, m.uv, normals, near, m.tris, texture, theme.primary)
+        wrap.draw_design(panel, pts, normals, near, design, theme, t, lambda: wrap.animated_expression(t))
 
     def _effect(self, name: str, theme: Theme):
         key = (name, theme)
