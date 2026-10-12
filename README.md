@@ -33,8 +33,11 @@ flow and threat model are in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Install (Windows installer)
 
-Build `dist\n0face-setup-<version>.exe` with `packaging\build.ps1` (see Development), run it,
-and launch **n0face** from the Start Menu. It installs per-user (no administrator prompt), bundles
+**[Download the latest installer from Releases](https://github.com/kaloyanstefanov66/n0face/releases/latest)**
+(`n0face-setup-<version>.exe`), run it, and launch **n0face** from the Start Menu. The installer
+isn't code-signed yet, so Windows SmartScreen may warn you: click **More info → Run anyway**, or
+first check the SHA-256 listed in the release notes. You can also build it yourself with
+`packaging\build.ps1` (see Development). It installs per-user (no administrator prompt), bundles
 the face model (so nothing is downloaded), and has a normal uninstaller.
 
 To use n0face as a camera in Discord, Teams, Zoom or OBS, also install **OBS Studio**: it
