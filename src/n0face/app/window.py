@@ -67,9 +67,9 @@ class TitleBar(QFrame):
         lay.setSpacing(0)
         lay.addStretch()
         for text, name, slot, tip in (
-            ("—", "WinBtn", window.showMinimized, "Minimize"),
-            ("□", "WinBtn", window.toggle_maximized, "Maximize  (F11)"),
-            ("✕", "CloseBtn", window.close, "Close"),
+            ("â€”", "WinBtn", window.showMinimized, "Minimize"),
+            ("â–¡", "WinBtn", window.toggle_maximized, "Maximize  (F11)"),
+            ("âœ•", "CloseBtn", window.close, "Close"),
         ):
             b = QPushButton(text)
             b.setObjectName(name)
@@ -84,11 +84,10 @@ class TitleBar(QFrame):
         y = 36
         p.setFont(mono(20, bold=True, spacing=1.0))
         p.setPen(QColor(TEXT))
-        p.drawText(24, y, "n")
-        x = 24 + p.fontMetrics().horizontalAdvance("n")
+        # Wordmark as in the logo: "n0" in the accent color, "face" in white.
         p.setPen(ACCENT)
-        p.drawText(x, y, "0")
-        x += p.fontMetrics().horizontalAdvance("0")
+        p.drawText(24, y, "n0")
+        x = 24 + p.fontMetrics().horizontalAdvance("n0")
         p.setPen(QColor(TEXT))
         p.drawText(x, y, "face")
         x += p.fontMetrics().horizontalAdvance("face") + 24
@@ -463,7 +462,7 @@ class MainWindow(QWidget):
         self.out_field.setReadOnly(True)
         self.out_field.setFont(mono(8.5, spacing=0.8))
         save.addWidget(self.out_field, 1)
-        folder = QPushButton("❐")
+        folder = QPushButton("â")
         folder.setObjectName("IconBtn")
         folder.setFont(mono(11))
         folder.setFixedWidth(40)
@@ -498,7 +497,7 @@ class MainWindow(QWidget):
         self.stream_toggle.toggled.connect(self._toggle_stream)
         cl.addWidget(self.stream_toggle)
         cl.addWidget(Callout(
-            "Shows up as “OBS Virtual Camera” in Discord, Teams, Zoom and OBS. "
+            "Shows up as â€œOBS Virtual Cameraâ€ in Discord, Teams, Zoom and OBS. "
             "Needs OBS Studio installed (it doesn't have to be running).", "info"))
         cl.addStretch()
         self.source_pages.addWidget(cam)
@@ -693,7 +692,7 @@ class MainWindow(QWidget):
             self._schedule_preview()
         else:
             self.viewport.caption = "OUTPUT // WHAT OTHER APPS RECEIVE"
-            self.viewport.message = ("CAMERA OFF", "press ENGAGE — the feed is masked from frame one")
+            self.viewport.message = ("CAMERA OFF", "press ENGAGE â€” the feed is masked from frame one")
             self.viewport.busy_text = ""
             self.viewport.set_image(None)
         self.viewport.style_changed()
@@ -848,8 +847,8 @@ class MainWindow(QWidget):
 
     def _on_file_progress(self, i: int, n: int, frac: float, name: str) -> None:
         self.engage.set_progress((i - 1 + frac) / max(n, 1))
-        bar = "█" * int(frac * 24)
-        self.stats.set_text(f"FILE {i}/{n}    {name}    {bar:░<24}  {frac * 100:5.1f}%")
+        bar = "â–ˆ" * int(frac * 24)
+        self.stats.set_text(f"FILE {i}/{n}    {name}    {bar:â–‘<24}  {frac * 100:5.1f}%")
 
     def _on_file_done(self, report) -> None:
         self._outputs.append(report.output)
@@ -869,19 +868,19 @@ class MainWindow(QWidget):
         self.engage.set_running(False)
         self._refresh_engage()
         state = "CANCELLED" if cancelled else "DONE"
-        self.stats.set_text(f"{state}    saved {ok}    failed {failed}    → details in SYSTEM tab")
+        self.stats.set_text(f"{state}    saved {ok}    failed {failed}    â†’ details in SYSTEM tab")
         self.run_log.setText("\n".join(self._file_log[-6:]) or "nothing saved")
         self.open_folder.setVisible(bool(self._outputs))
         if ok and not cancelled:
             self.engage.celebrate()
             self.viewport.toast(
                 f"{ok} FILE{'S' if ok != 1 else ''} SECURED",
-                "masked copies saved · metadata stripped · originals untouched", "ok", 5,
+                "masked copies saved Â· metadata stripped Â· originals untouched", "ok", 5,
             )
         if failed:
             self.viewport.toast(
                 f"{failed} FILE{'S' if failed != 1 else ''} COULDN'T BE PROCESSED",
-                f"{', '.join(self._failures[:2])} — see SYSTEM tab for the reason", "error", 7,
+                f"{', '.join(self._failures[:2])} â€” see SYSTEM tab for the reason", "error", 7,
             )
         if cancelled:
             self.viewport.toast("CANCELLED", "partial outputs were deleted", "warn", 4)
@@ -961,7 +960,7 @@ class MainWindow(QWidget):
         self.st_stream.set("ON" if on else "OFF", OK if on else DIM)
         self.stream_note.setText(f"publishing as: {info}" if on else info)
         if on:
-            self.viewport.toast("VIRTUAL CAMERA ON", f"pick “{info}” in Discord / Teams / Zoom / OBS", "ok")
+            self.viewport.toast("VIRTUAL CAMERA ON", f"pick â€œ{info}â€ in Discord / Teams / Zoom / OBS", "ok")
         elif info:
             self.stream_toggle.blockSignals(True)
             self.stream_toggle.setChecked(False)

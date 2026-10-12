@@ -13,6 +13,16 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 
 def make_icon() -> QIcon:
+    from n0face.resources import resource
+
+    icon_file = resource("assets", "n0face.ico")
+    if icon_file.exists():
+        return QIcon(str(icon_file))
+    return _drawn_icon()
+
+
+def _drawn_icon() -> QIcon:
+    """Fallback when the icon file is missing (e.g. a partial checkout)."""
     from n0face.app.style import mono
 
     pm = QPixmap(64, 64)

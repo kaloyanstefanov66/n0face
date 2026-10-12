@@ -5,7 +5,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-DEFAULT_MODEL = Path(__file__).resolve().parents[2] / "models" / "face_landmarker.task"
+from n0face.resources import resource
+
+DEFAULT_MODEL = resource("models", "face_landmarker.task")
 
 
 def _tesselation() -> np.ndarray:

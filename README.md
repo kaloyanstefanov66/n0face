@@ -1,5 +1,7 @@
 # n0face
 
+![n0face: local face privacy](assets/logo.png)
+
 Local-only face masking and anonymization for your webcam. n0face finds your face, replaces it
 with generated content, and publishes the result as a **virtual camera** that Discord, Teams,
 Zoom, OBS, Meet and other apps can use.
@@ -29,10 +31,19 @@ The virtual camera output works in every mode.
 Measured performance and failure rates go in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). The data
 flow and threat model are in [docs/PRIVACY.md](docs/PRIVACY.md).
 
+## Install (Windows installer)
+
+Build `dist\n0face-setup-<version>.exe` with `packaging\build.ps1` (see Development), run it,
+and launch **n0face** from the Start Menu. It installs per-user (no administrator prompt), bundles
+the face model (so nothing is downloaded), and has a normal uninstaller.
+
+To use n0face as a camera in Discord, Teams, Zoom or OBS, also install **OBS Studio**: it
+provides the virtual camera driver n0face publishes through (OBS doesn't need to be running).
+Everything else, including the masked preview and photo/video processing, works without it.
+
 ## Install (Windows, from source)
 
-Requirements: Python 3.11+, a webcam and **OBS Studio** (it installs the virtual camera driver
-n0face publishes through; OBS doesn't need to be running).
+Requirements: Python 3.11+ and a webcam. OBS Studio is optional (virtual camera only, as above).
 
 ```bash
 git clone <this repo> n0face && cd n0face
@@ -106,6 +117,18 @@ A headless version is also available:
 ```
 
 `requirements.lock` pins the exact dependency versions the tests and benchmarks were run with.
+
+Optional GPU rendering for 3D-wrapped masks: `.venv\Scripts\pip install -e .[gpu]`.
+
+Build the installer (needs PyInstaller and Inno Setup 6, e.g. `winget install JRSoftware.InnoSetup`):
+
+```bash
+.venv\Scripts\pip install pyinstaller
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+```
+
+This regenerates the icon and logo (`packaging/make_icon.py`), bundles the app with PyInstaller
+(`dist\n0face\`), and compiles the installer (`dist\n0face-setup-<version>.exe`).
 
 ## License
 
