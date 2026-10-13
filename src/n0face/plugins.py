@@ -16,10 +16,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
-# Shown locked (with a PRO tag) when the add-on isn't installed.
+# Where the EXTRAS tab's support button points (opened in the browser; n0face itself stays offline).
 PRO_URL = "https://github.com/kaloyanstefanov66/n0face#n0face-pro"
-PRO_MASKS = ("led", "circuit", "hex", "skull", "wireframe")
-PRO_ACCESSORIES = ("horns", "halo", "crown", "ears", "spikes", "antenna", "shades")
 
 
 class Overlay(Protocol):

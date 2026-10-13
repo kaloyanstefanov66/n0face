@@ -20,6 +20,8 @@ datas = [
     (str(ROOT / "assets" / "fonts" / "SedgwickAveDisplay-Regular.ttf"), "assets/fonts"),
     (str(ROOT / "assets" / "fonts" / "SedgwickAveDisplay-OFL.txt"), "assets/fonts"),
     (str(ROOT / "LICENSE"), "."),
+    (str(ROOT / "LICENSE-PLUGIN-EXCEPTION.md"), "."),
+    *((str(f), "assets/extras") for f in sorted((ROOT / "assets" / "extras").glob("*.png"))),
 ]
 binaries = collect_dynamic_libs("pyvirtualcam")
 hiddenimports = collect_submodules("n0face_pro") if PRO else []

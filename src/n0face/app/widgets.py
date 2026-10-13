@@ -787,6 +787,32 @@ class AccessoryTile(Animated):
         p.drawText(QRectF(r.left(), r.bottom() - 26, r.width(), 20), Qt.AlignmentFlag.AlignCenter, self.kind.upper())
 
 
+class PreviewTile(QWidget):
+    """A picture with a caption under it (EXTRAS previews). Not clickable."""
+
+    def __init__(self, path, caption: str):
+        from PySide6.QtGui import QImage
+
+        super().__init__()
+        self.image = QImage(str(path))
+        self.caption = caption
+        self.setFixedSize(108, 120)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.setPen(QPen(QColor(LINE_STRONG), 1))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(r)
+        if not self.image.isNull():
+            p.drawImage(QRectF(r.left() + 6, r.top() + 4, r.width() - 12, r.width() - 12), self.image)
+        p.setFont(mono(7.5, spacing=1.6))
+        p.setPen(QColor(DIM))
+        p.drawText(QRectF(r.left(), r.bottom() - 20, r.width(), 16), Qt.AlignmentFlag.AlignCenter, self.caption)
+
+
 class Slider(QWidget):
     """A thin track with an accent fill and a knob that springs to where you drag it."""
 

@@ -28,12 +28,12 @@ from n0face.app.viewport import Viewport
 from n0face.app.widgets import (
     ACCENT,
     ActionButton,
-    AccessoryTile,
     AnimatedStack,
     Callout,
     ChoiceRow,
     DropZone,
     FileRow,
+    PreviewTile,
     SectionHeader,
     Segmented,
     Slider,
@@ -48,6 +48,7 @@ from n0face.app.worker import FileWorker, Worker
 from n0face.media import IMAGE_EXTS, VIDEO_EXTS, collect_inputs, ffmpeg_path, media_kind
 from n0face.modes import MODE_NAMES, MODES
 from n0face.pipeline import Engine, Stats
+from n0face.resources import resource
 from n0face.theme import THEMES
 from n0face import glitch, plugins, wrap
 
@@ -177,21 +178,7 @@ def page() -> tuple[QScrollArea, QVBoxLayout]:
     return scroll, lay
 
 
-def lock_icon(_kind: str, px: int, color: QColor) -> QImage:
-    """A padlock, for locked PRO tiles."""
-    img = QImage(px, px, QImage.Format.Format_ARGB32_Premultiplied)
-    img.fill(0)
-    p = QPainter(img)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setPen(QPen(color, max(px / 16, 1.5)))
-    w, h = px * 0.46, px * 0.34
-    body = QRectF((px - w) / 2, px * 0.48, w, h)
-    p.drawRoundedRect(body, 2, 2)
-    p.drawArc(QRectF(px / 2 - w * 0.3, px * 0.2, w * 0.6, w * 0.7), 0, 180 * 16)
-    p.drawLine(QPointF(px / 2 - w * 0.3, px * 0.2 + w * 0.35), QPointF(px / 2 - w * 0.3, px * 0.48))
-    p.drawLine(QPointF(px / 2 + w * 0.3, px * 0.2 + w * 0.35), QPointF(px / 2 + w * 0.3, px * 0.48))
-    p.end()
-    return img
+EXTRAS_PREVIEWS = ("led", "circuit", "hex", "skull", "wireframe", "horns", "halo", "crown", "customize")
 
 
 def open_pro_page() -> None:
@@ -435,7 +422,7 @@ class MainWindow(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
-        self.tabs = TabBar(["SOURCE", "MASK", "GEAR", "LOOK", "SYSTEM"])
+        self.tabs = TabBar(["SOURCE", "MASK", "GEAR" if "gear" in plugins.registry.pages else "EXTRAS", "LOOK", "SYSTEM"])
         lay.addWidget(self.tabs)
         self.pages = AnimatedStack()
         for build in (self._page_source, self._page_mask, self._page_gear, self._page_look, self._page_system):
@@ -542,7 +529,6 @@ class MainWindow(QWidget):
         lay.addSpacing(16)
         lay.addWidget(SectionHeader(4, "EFFECT"))
         self.effect_group = QButtonGroup(self)
-        self.locked_rows: list[ChoiceRow] = []
         self.effect_box = QVBoxLayout()
         self.effect_box.setSpacing(8)
         lay.addLayout(self.effect_box)
@@ -577,14 +563,8 @@ class MainWindow(QWidget):
             slider.changed.connect(lambda v, k=key: self._set_glitch_option(k, v))
             row.addWidget(slider, 1)
             opts.addLayout(row)
-        if not knobs:
-            locked = QPushButton("INTENSITY \u00b7 FREQUENCY \u00b7 LENGTH   PRO")
-            locked.setObjectName("Locked")
-            locked.setFont(mono(7.5, spacing=1.4))
-            locked.setToolTip("Tune glitch bursts with n0face PRO.")
-            locked.clicked.connect(open_pro_page)
-            opts.addWidget(locked)
-        self.glitch_opts.setVisible(glitch.config.enabled)
+        self.has_glitch_knobs = bool(knobs)
+        self.glitch_opts.setVisible(glitch.config.enabled and self.has_glitch_knobs)
         lay.addWidget(self.glitch_opts)
         self.hud_toggle = Toggle("STATUS HUD", "(ID / CONF box)")
         self.hud_toggle.setToolTip("The ID / CONF / STATUS MASKED box, bounding box and tracking lines.")
@@ -606,26 +586,22 @@ class MainWindow(QWidget):
         if build is not None:
             return build(self)
         scroll, lay = page()
-        lay.addWidget(SectionHeader(5, "ACCESSORIES"))
-        lay.addWidget(label("n0face PRO. Horns, halo, crown and more, riding on your head in 3D.", "Dim", 7.5))
+        lay.addWidget(SectionHeader(5, "EXTRAS"))
+        lay.addWidget(label(
+            "n0face is free, and everything that protects you always will be. n0face PRO is the "
+            "cosmetic stuff: five more masks, accessories that ride on your head in 3D, and full "
+            "customization (colours, eye and mouth styles, glitch tuning). Buying it funds "
+            "development and the code-signing certificate that removes the Windows warning for "
+            "everyone.", "Body", 8))
         grid = QGridLayout()
         grid.setSpacing(8)
-        for i, kind in enumerate(plugins.PRO_ACCESSORIES):
-            tile = AccessoryTile(kind, lock_icon)
-            tile.setCheckable(False)
-            tile.setToolTip(f"{kind.upper()} \u00b7 n0face PRO")
-            tile.clicked.connect(open_pro_page)
-            grid.addWidget(tile, i // 3, i % 3)
+        for i, name in enumerate(EXTRAS_PREVIEWS):
+            grid.addWidget(PreviewTile(resource("assets", "extras", f"{name}.png"), name.upper()), i // 3, i % 3)
         lay.addLayout(grid)
-        lay.addSpacing(16)
-        lay.addWidget(SectionHeader(6, "CUSTOMIZE"))
-        lay.addWidget(label(
-            "n0face PRO. Recolour each part of a mask (eyes, mouth, lines, accents, base), swap "
-            "eye and mouth styles, set stroke and glow, tune GLITCH, and get five more masks: "
-            "LED, CIRCUIT, HEX, SKULL, WIREFRAME.", "Dim", 7.5))
-        get = QPushButton("GET n0face PRO")
+        get = QPushButton("SUPPORT n0face  \u00b7  GET PRO")
         get.setObjectName("Locked")
-        get.setFont(mono(9, spacing=2.4))
+        get.setFont(mono(9, spacing=2.0))
+        get.setToolTip("Opens the n0face PRO page in your browser.")
         get.clicked.connect(open_pro_page)
         lay.addWidget(get)
         lay.addStretch()
@@ -690,6 +666,8 @@ class MainWindow(QWidget):
             "Face and head detection run on this device with two local models. Network access is "
             "disabled while n0face runs. Nothing is uploaded, logged or recorded. Only display "
             "preferences are remembered between sessions, never file names or paths."))
+        if not plugins.pro():
+            lay.addWidget(label("Like it? n0face PRO adds extra masks and accessories: see EXTRAS.", "Faint", 7.5))
         lay.addStretch()
         return scroll
 
@@ -719,19 +697,6 @@ class MainWindow(QWidget):
             row.clicked.connect(lambda _=False, n=name: self._select_effect(n))
             self.effect_group.addButton(row)
             self.effect_box.addWidget(row)
-        for b in self.locked_rows:
-            self.effect_box.removeWidget(b)
-            b.deleteLater()
-        self.locked_rows = []
-        if mode.name == "mask":
-            for name in (n for n in plugins.PRO_MASKS if n not in mode.effects):
-                row = ChoiceRow("·", name.upper(), "PRO")
-                row.setCheckable(False)
-                row.setEnabled(True)
-                row.setToolTip("n0face PRO")
-                row.clicked.connect(open_pro_page)
-                self.locked_rows.append(row)
-                self.effect_box.addWidget(row)
 
     def _select_effect(self, name: str) -> None:
         if name == self.engine.effect_name:
@@ -769,7 +734,7 @@ class MainWindow(QWidget):
 
     def _toggle_glitch(self, on: bool) -> None:
         glitch.config.enabled = on
-        self.glitch_opts.setVisible(on)
+        self.glitch_opts.setVisible(on and self.has_glitch_knobs)
         self._schedule_preview()
 
     def _set_glitch_option(self, key: str, value: float) -> None:
