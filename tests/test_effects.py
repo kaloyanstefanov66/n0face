@@ -2,13 +2,13 @@ import numpy as np
 import pytest
 
 from conftest import H, W
-from n0face.effects import EFFECT_NAMES, make_effects
+from n0face.effects import BUILTIN_EFFECTS, make_effects
 from n0face.mask import build_mask
 
 EDGES = np.random.default_rng(1).integers(0, 478, size=(800, 2))
 
 
-@pytest.fixture(params=EFFECT_NAMES)
+@pytest.fixture(params=BUILTIN_EFFECTS)
 def effect(request):
     return make_effects(EDGES)[request.param]
 

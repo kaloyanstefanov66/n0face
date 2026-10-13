@@ -8,8 +8,10 @@ Zoom, OBS, Meet and other apps can use.
 
 - **On-device.** Detection runs locally (MediaPipe). No cloud, no accounts, no telemetry.
   Python-level networking is switched off while the app runs.
-- **Replacement, not blur.** Masked regions are generated from scratch, not filtered from your
-  face pixels (the one exception, `pixelate`, is labeled as the weakest option).
+- **Replacement, not blur, where it counts.** In the privacy modes (`obfuscate`, `anonymize`)
+  masked regions are generated from scratch, not filtered from your face pixels (the one
+  exception, `pixelate`, is labeled as the weakest option). The decorative `mask` mode shows a
+  heavy blur of your face under its design by default; switch it to SOLID to hide it fully.
 - **Fail-closed.** If face tracking drops for more than a few frames, the whole frame is hidden
   until your face is found again.
 - **No recording.** Live camera frames are never written to disk. The only files n0face
@@ -22,7 +24,7 @@ clothing, room and behavior can all identify you.
 
 | Mode | What it does | What it does NOT protect |
 |---|---|---|
-| `mask` | Stylized LED or wireframe mask with a scanner HUD. | **Decorative.** It renders your facial geometry and expressions, which are themselves identifying. |
+| `mask` | Stylized masks (MESH and X; five more with [n0face PRO](#n0face-pro)) over a heavy blur of your face, or a solid backing, with an optional scanner HUD and GLITCH bursts. | **Decorative.** It renders your facial geometry and expressions, which are themselves identifying; the default blurred backing also keeps your skin tone and rough shape. |
 | `obfuscate` | Replaces face pixels with glitch blocks or static (or pixelation, the weakest option). | Face outline, hair, ears, body, voice, background. |
 | `anonymize` | Covers the whole head with a shape-hiding ellipse, renders no geometry and holds the cover longer on dropouts. | Body, voice, background, gait, anything said on camera. |
 
@@ -55,7 +57,8 @@ python -m venv .venv
 .venv\Scripts\python scripts/get_model.py
 ```
 
-`get_model.py` downloads the 3.8 MB face landmark model once. It's the only network access
+`get_model.py` downloads two MediaPipe models once: face landmarks (3.8 MB) and pose (5.8 MB,
+finds heads the face model misses, like when you look down). It's the only network access
 n0face ever makes.
 
 ## Run
@@ -111,6 +114,21 @@ A headless version is also available:
 .venv\Scripts\n0face-cli --mode anonymize --preview
 ```
 
+## n0face PRO
+
+n0face is free and open source, and every privacy feature is in it: all three modes, head
+tracking with the pose model, fail-closed hiding, file processing, the virtual camera. n0face
+PRO is an optional paid add-on, for the fun stuff:
+
+- five more masks: LED, CIRCUIT, HEX, SKULL, WIREFRAME
+- the GEAR tab: accessories (horns, halo, crown, ears, spikes, antenna, shades)
+- CUSTOMIZE: recolour each part of a mask, swap the X mask's eyes and mouth, stroke and glow
+- GLITCH tuning: intensity, frequency, length
+
+It plugs in through `n0face.plugins`, so the free app shows those options with a PRO tag. Buying
+it also pays for the code-signing certificate that gets rid of Windows' "unknown publisher"
+warning for everyone.
+
 ## Development
 
 ```bash
@@ -135,4 +153,9 @@ This regenerates the icon and logo (`packaging/make_icon.py`), bundles the app w
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE). Add-ons that use only the plugin interface may use any
+license: see [LICENSE-PLUGIN-EXCEPTION.md](LICENSE-PLUGIN-EXCEPTION.md).
+
+The headings use [Sedgwick Ave Display](https://github.com/googlefonts/sedgwickave) by the Sedgwick Ave
+Project Authors, bundled under the SIL Open Font License 1.1
+([assets/fonts/SedgwickAveDisplay-OFL.txt](assets/fonts/SedgwickAveDisplay-OFL.txt)).

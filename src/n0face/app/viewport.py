@@ -19,7 +19,7 @@ from n0face.app import motion
 from n0face.app.motion import GENTLE, SMOOTH, SNAPPY, Spring, ease_out_cubic, mix
 from n0face.app.preview3d import MaskScene, Pose, rotation
 from n0face.app.services import RenderRequest, RenderThread
-from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, WARN, mono, with_alpha
+from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, WARN, graffiti, mono, spray_text, with_alpha
 from n0face.app.widgets import ACCENT, brackets
 
 MAX_RENDER = 720  # longest side of the 3D render, in device pixels; upscaled smoothly
@@ -591,9 +591,10 @@ class Viewport(QWidget):
         breathe = 0.5 + 0.5 * math.sin(t * 2.0) if not motion.reduced_motion() else 1.0
         p.setPen(QPen(with_alpha(ACCENT, int(140 + 115 * breathe)), 1.2))
         brackets(p, m, 9)
-        p.setFont(mono(13, bold=True, spacing=3.0))
-        p.setPen(ACCENT)
-        p.drawText(m.adjusted(0, 6, 0, -24), Qt.AlignmentFlag.AlignCenter, title)
+        font = graffiti(19)
+        p.setFont(font)
+        w = p.fontMetrics().horizontalAdvance(title.lower())
+        spray_text(p, QPointF(m.center().x() - w / 2, m.top() + 26), title.lower(), font, ACCENT, -2)
         p.setFont(mono(8.5, spacing=1.0))
         p.setPen(QColor(DIM))
         p.drawText(m.adjusted(0, 30, 0, -4), Qt.AlignmentFlag.AlignCenter, hint)

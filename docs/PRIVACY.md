@@ -6,13 +6,13 @@
 webcam ──frames──> [capture]  (RAM only)
                       │
                       ▼
-                 [detector]  MediaPipe FaceLandmarker, local model file, CPU
-                      │ landmarks (478 points per face)
+                 [detector]  MediaPipe FaceLandmarker + PoseLandmarker, local model files, CPU
+                      │ landmarks (478 points per face) + heads the face model missed
                       ▼
                  [mask + tracker]  expanded hull/ellipse, OR'd with previous frame,
                       │            fail-closed after N missed frames
                       ▼
-                 [effect]  generated fill (no camera pixels, except "pixelate")
+                 [effect]  generated fill (no camera pixels, except "pixelate" and mask mode's blur)
                       │
           ┌───────────┴────────────┐
           ▼                        ▼
@@ -61,6 +61,8 @@ original file ──read──> [detector: full image + overlapping tiles]
 | Output files carry no metadata | OpenCV encoding for photos; ffmpeg `-map_metadata -1` for video | `tests/test_media.py::test_photo_masked_metadata_stripped_original_untouched`, `test_video_strips_metadata_and_audio_by_default` |
 | Originals are never modified | Outputs get a `.n0face` name and never overwrite existing files | `tests/test_media.py::test_output_path_never_overwrites` |
 | Short detector misses in videos stay covered | Mask is the union of detections over ±`window` frames | `tests/test_media.py::test_video_window_covers_short_detector_misses` |
+| Heads the face model misses stay covered | The pose model finds each person's head. One with no face mesh gets a whole-head ellipse in obfuscate/anonymize; in mask mode the design is drawn on a face mesh fitted to the head, fully covered even with 3D wrap (SOLID backing) | `tests/test_heads.py` |
+| A face hit on a hand doesn't stand in for the real face | Face hits on a person's hand and in no head are dropped, so they can't stop a frame failing closed | `tests/test_heads.py::test_face_on_a_hand_is_dropped` |
 | Camera state is visible | The app shows a blinking CAMERA LIVE status; the camera is released on DISENGAGE or exit | Manual |
 
 ## Known limits (read these)
@@ -69,10 +71,13 @@ original file ──read──> [detector: full image + overlapping tiles]
   bypasses it. For a hard guarantee, add an OS firewall rule that blocks the n0face/python
   executable.
 - **Detection can miss.** Extreme angles, occlusion, low light and motion blur can cause misses.
-  Short misses are covered by holding a growing mask; long ones hide the frame. A face the
-  detector **never** saw while it detected another face is not covered. See the
+  The pose model covers most face-model misses (looking down or away) with a head mask; short
+  misses of both are covered by holding a growing mask; long ones hide the frame. A head
+  **neither** model saw while another person was detected is not covered. See the
   "potential leak frames" metric in the benchmarks.
-- **Mask mode is decorative.** It reproduces your facial geometry and expressions.
+- **Mask mode is decorative.** It reproduces your facial geometry and expressions. Its default
+  BLUR backing shows a heavy blur of your face (colour, rough shape) under the design; SOLID
+  shows none. Fail-closed frames are never blurred: they're hidden like in every mode.
 - **Pixelation is weak.** It is derived from your face pixels and can sometimes be matched or
   partially reversed.
 - **Downstream apps are out of scope.** Once a frame reaches Discord, Teams and so on, their

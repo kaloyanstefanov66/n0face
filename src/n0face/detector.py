@@ -1,13 +1,38 @@
-"""Face landmark detection with MediaPipe FaceLandmarker, run entirely on-device."""
+"""Face landmark detection with MediaPipe FaceLandmarker, run entirely on-device.
 
+Each detector also runs the pose model (n0face.heads): it drops face hits that land on a
+hand, and reports the heads of people whose face the face model missed.
+"""
+
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from n0face.heads import BackgroundPose, Head, PoseFinder, match
 from n0face.resources import resource
 
 DEFAULT_MODEL = resource("models", "face_landmarker.task")
+CROP_SIDE = 384  # head crops are resized to this before the face model looks again
+
+
+@dataclass
+class Found:
+    """What a detector saw in one frame."""
+
+    faces: list[np.ndarray] = field(default_factory=list)  # (478, 2) face meshes, pixels
+    heads: list[Head] = field(default_factory=list)  # people whose face has no mesh
+
+    def __bool__(self) -> bool:
+        return bool(self.faces or self.heads)
+
+    def scaled(self, s: float) -> "Found":
+        return Found([f * s for f in self.faces], [h.scaled(s) for h in self.heads])
+
+    @staticmethod
+    def union(found: "list[Found]") -> "Found":
+        return Found([f for x in found for f in x.faces], [h for x in found for h in x.heads])
 
 
 def _tesselation() -> np.ndarray:
@@ -49,25 +74,38 @@ def _to_pixels(result, w: int, h: int, offset=(0, 0)) -> list[np.ndarray]:
 
 
 class FaceDetector:
-    """Live video detector with temporal tracking. Returns one (478, 2) pixel array per face."""
+    """Live video detector with temporal tracking.
 
-    def __init__(self, model_path: Path = DEFAULT_MODEL, max_faces: int = 4):
+    Pose runs on a background thread so it never slows the frame loop; its result trails by a
+    frame or two, so face hits are only dropped as false when it's current.
+    """
+
+    def __init__(self, model_path: Path = DEFAULT_MODEL, max_faces: int = 4, pose: bool = True):
         self._mp, self._landmarker = _create_landmarker(model_path, max_faces, video=True)
+        self._pose = BackgroundPose(max_faces) if pose else None
         self.edges = _tesselation()
         self._last_ts = -1
 
-    def detect(self, frame_bgr: np.ndarray, timestamp_ms: int) -> list[np.ndarray]:
+    def detect(self, frame_bgr: np.ndarray, timestamp_ms: int) -> Found:
         # VIDEO mode requires strictly increasing timestamps.
         timestamp_ms = max(timestamp_ms, self._last_ts + 1)
         self._last_ts = timestamp_ms
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        if self._pose is not None:
+            self._pose.submit(rgb, timestamp_ms)
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
         result = self._landmarker.detect_for_video(image, timestamp_ms)
         h, w = frame_bgr.shape[:2]
-        return _to_pixels(result, w, h)
+        faces = _to_pixels(result, w, h)
+        if self._pose is None:
+            return Found(faces)
+        people, fresh = self._pose.latest()
+        return Found(*match(faces, people, drop_false=fresh))
 
     def close(self) -> None:
         self._landmarker.close()
+        if self._pose is not None:
+            self._pose.close()
 
 
 def _bbox(lm: np.ndarray) -> tuple[float, float, float, float]:
@@ -105,8 +143,9 @@ class StillDetector:
     people in the background) that a single full-image pass misses.
     """
 
-    def __init__(self, model_path: Path = DEFAULT_MODEL, max_faces: int = 20, thorough: bool = True):
+    def __init__(self, model_path: Path = DEFAULT_MODEL, max_faces: int = 20, thorough: bool = True, pose: bool = True):
         self._mp, self._landmarker = _create_landmarker(model_path, max_faces, video=False)
+        self._pose = PoseFinder(video=False, max_people=6) if pose else None
         self.edges = _tesselation()
         self.thorough = thorough
 
@@ -115,7 +154,7 @@ class StillDetector:
         h, w = rgb.shape[:2]
         return _to_pixels(self._landmarker.detect(image), w, h, (x, y))
 
-    def detect(self, frame_bgr: np.ndarray, timestamp_ms: int = 0, tiles: bool | None = None) -> list[np.ndarray]:
+    def detect(self, frame_bgr: np.ndarray, timestamp_ms: int = 0, tiles: bool | None = None) -> Found:
         """`tiles` overrides `thorough` for this call (videos tile only every few frames)."""
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         faces = self._detect_region(rgb, 0, 0)
@@ -125,7 +164,26 @@ class StillDetector:
                 for lm in self._detect_region(rgb[y : y + th, x : x + tw], x, y):
                     if all(_iou(_bbox(lm), _bbox(f)) < 0.3 for f in faces):
                         faces.append(lm)
-        return faces
+        if self._pose is None:
+            return Found(faces)
+        people = self._pose.find(rgb)
+        # A closer look around each head no face covers yet: small faces that the full-image
+        # pass misses are found at a fraction of the cost of the tiles.
+        h, w = rgb.shape[:2]
+        for person in people:
+            box = person.head.crop(w, h)
+            if box is None or any(person.head.contains(f[:468].mean(axis=0), 1.3) for f in faces):
+                continue
+            x0, y0, x1, y1 = box
+            s = CROP_SIDE / max(x1 - x0, y1 - y0)
+            crop = cv2.resize(rgb[y0:y1, x0:x1], None, fx=s, fy=s, interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
+            for lm in self._detect_region(crop, 0, 0):
+                lm = lm / s + (x0, y0)
+                if all(_iou(_bbox(lm), _bbox(f)) < 0.3 for f in faces):
+                    faces.append(lm.astype(np.float32))
+        return Found(*match(faces, people))
 
     def close(self) -> None:
         self._landmarker.close()
+        if self._pose is not None:
+            self._pose.close()

@@ -4,6 +4,14 @@
 #ifndef AppVersion
   #define AppVersion "0.1.0"
 #endif
+#ifndef Edition
+  #define Edition "free"
+#endif
+#if Edition == "pro"
+  #define SetupName "n0face-pro-setup-" + AppVersion
+#else
+  #define SetupName "n0face-setup-" + AppVersion
+#endif
 
 [Setup]
 AppId={{6F3B2A51-8E0C-4C3B-9B7A-0F4D2C1E9A77}
@@ -19,7 +27,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\dist
-OutputBaseFilename=n0face-setup-{#AppVersion}
+OutputBaseFilename={#SetupName}
 SetupIconFile=..\assets\n0face.ico
 UninstallDisplayIcon={app}\n0face.exe
 LicenseFile=..\LICENSE

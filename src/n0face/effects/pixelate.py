@@ -18,7 +18,7 @@ class PixelateEffect(Effect):
     name = "pixelate"
     uses_camera_pixels = True
 
-    def apply(self, frame, mask, faces, t):
+    def apply(self, frame, mask, faces, t, cover=None, blur=False):
         out = frame.copy()
         ys, xs = np.nonzero(mask)
         if len(xs) == 0:

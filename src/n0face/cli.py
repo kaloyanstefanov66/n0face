@@ -10,7 +10,8 @@ from pathlib import Path
 
 import cv2
 
-from n0face.effects import EFFECT_NAMES
+from n0face import plugins
+from n0face.effects import effect_names
 from n0face.modes import MODE_NAMES
 from n0face.theme import THEMES
 
@@ -18,6 +19,7 @@ PREVIEW_WINDOW = "n0face (q to quit)"
 
 
 def parse_args(argv=None) -> argparse.Namespace:
+    plugins.load()
     p = argparse.ArgumentParser(
         prog="n0face-cli",
         description="Mask or anonymize your face and publish it as a virtual webcam. "
@@ -25,7 +27,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "For photos and videos, use: n0face-cli process --help",
     )
     p.add_argument("--mode", choices=MODE_NAMES, default="mask", help="privacy mode (default: mask)")
-    p.add_argument("--effect", choices=EFFECT_NAMES, help="effect within the mode (default: mode's first)")
+    p.add_argument("--effect", choices=effect_names(), help="effect within the mode (default: mode's first)")
     p.add_argument("--theme", choices=list(THEMES), default="cyan")
     p.add_argument("--camera", type=int, default=0, help="webcam index (default 0)")
     p.add_argument("--width", type=int, default=1280)
@@ -39,6 +41,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 
 
 def parse_process_args(argv) -> argparse.Namespace:
+    plugins.load()
     p = argparse.ArgumentParser(
         prog="n0face-cli process",
         description="Mask or anonymize faces in existing photos and videos. Originals are never modified; "
@@ -47,7 +50,7 @@ def parse_process_args(argv) -> argparse.Namespace:
     p.add_argument("inputs", nargs="+", type=Path, help="image/video files or folders")
     p.add_argument("--out", type=Path, help="output folder (default: next to each original)")
     p.add_argument("--mode", choices=MODE_NAMES, default="anonymize", help="privacy mode (default: anonymize)")
-    p.add_argument("--effect", choices=EFFECT_NAMES, help="effect within the mode (default: mode's first)")
+    p.add_argument("--effect", choices=effect_names(), help="effect within the mode (default: mode's first)")
     p.add_argument("--theme", choices=list(THEMES), default="cyan")
     p.add_argument("--no-hud", action="store_true", help="disable the HUD overlay in mask mode")
     p.add_argument(

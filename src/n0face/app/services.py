@@ -153,20 +153,20 @@ class PreviewService(QThread):
                         if detector is None:
                             detector = StillDetector()
                         frame = first_frame(req.path)
-                        faces = detector.detect(frame)
+                        found = detector.detect(frame)
                         h, w = frame.shape[:2]
                         dw, dh = fit_size(w, h, PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE)
                         s = dw / w
                         disp = cv2.resize(frame, (dw, dh), interpolation=cv2.INTER_AREA) if s < 1 else frame
-                        cached = (disp, [f * s for f in faces])
+                        cached = (disp, found.scaled(s))
                         with self._lock:
                             self._cache[req.path] = cached
                             while len(self._cache) > CACHE_FILES:
                                 self._cache.popitem(last=False)
-                    disp, faces = cached
+                    disp, found = cached
                     # The cache only fills after the detector exists, so it's always loaded here.
                     processor = MediaProcessor(detector, req.mode, req.effect, req.theme, req.hud, on_miss=req.on_miss)
-                    out = processor.render_frame(disp, faces)
+                    out = processor.render_frame(disp, found)
                     self.ready.emit(req.request, bgr_to_qimage(out), str(req.path))
                 except (RuntimeError, OSError, ValueError) as e:
                     self.failed.emit(req.request, str(e))

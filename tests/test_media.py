@@ -138,6 +138,15 @@ def test_video_window_covers_short_detector_misses(tmp_path, face):
 
 
 @needs_ffmpeg
+def test_video_frames_with_only_a_head_are_masked_not_hidden(tmp_path, head):
+    """Looking down: the face model sees nothing but the pose model finds the head."""
+    src = tmp_path / "clip.mp4"
+    _make_video(src, frames=8)
+    report = MediaProcessor(FakeDetector([], heads=[head]), mode="mask").process(src)
+    assert report.hidden_frames == 0 and report.frames_with_faces == 8
+
+
+@needs_ffmpeg
 def test_video_long_miss_is_hidden(tmp_path, face):
     src = tmp_path / "clip.mp4"
     _make_video(src, frames=20)

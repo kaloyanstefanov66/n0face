@@ -4,8 +4,12 @@ Near-black, slightly teal surfaces; hairline borders; monospace uppercase labels
 color from the active theme. Panels are translucent so the ambient background breathes through.
 """
 
-from PySide6.QtGui import QColor, QFont
+import math
 
+from PySide6.QtCore import QPointF
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter
+
+from n0face.resources import resource
 from n0face.theme import Theme
 
 BG = "#05080a"
@@ -31,6 +35,46 @@ def mono(size: float = 9, bold: bool = False, spacing: float = 1.4) -> QFont:
     f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, spacing)
     f.setStyleHint(QFont.StyleHint.Monospace)
     return f
+
+
+GRAFFITI_FILE = resource("assets", "fonts", "SedgwickAveDisplay-Regular.ttf")  # SIL OFL 1.1
+_graffiti_family: str | None = None
+
+
+def graffiti(size: float) -> QFont:
+    """Spray-paint lettering for headings and the wordmark (falls back to bold mono)."""
+    global _graffiti_family
+    if _graffiti_family is None:
+        fid = QFontDatabase.addApplicationFont(str(GRAFFITI_FILE)) if GRAFFITI_FILE.exists() else -1
+        families = QFontDatabase.applicationFontFamilies(fid) if fid >= 0 else []
+        _graffiti_family = families[0] if families else ""
+    if not _graffiti_family:
+        return mono(size * 0.75, bold=True, spacing=2.0)
+    f = QFont(_graffiti_family)
+    f.setPointSizeF(size)
+    return f
+
+
+def spray_text(p: QPainter, pos: QPointF, text: str, font: QFont, color: QColor, angle: float = 0.0,
+               glow: int = 46) -> float:
+    """Graffiti text at baseline `pos`: tilted by `angle` degrees, with a soft spray halo in its
+    own colour. Returns the advance width."""
+    p.save()
+    p.translate(pos)
+    p.rotate(angle)
+    p.setFont(font)
+    if glow:
+        halo = QColor(color)
+        halo.setAlpha(glow)
+        p.setPen(halo)
+        for k in range(8):
+            a = k * math.pi / 4
+            p.drawText(QPointF(2.2 * math.cos(a), 2.2 * math.sin(a)), text)
+    p.setPen(color)
+    p.drawText(QPointF(0, 0), text)
+    width = p.fontMetrics().horizontalAdvance(text)
+    p.restore()
+    return width
 
 
 def hex_rgb(bgr: tuple[int, int, int]) -> str:
@@ -75,6 +119,8 @@ def stylesheet(theme: Theme) -> str:
     QPushButton:checked {{ border-color: {a}; color: {a}; background: {a_soft}; }}
     QPushButton:disabled {{ color: {FAINT}; border-color: {LINE}; }}
     #Segment {{ text-align: center; padding: 9px 6px; }}
+    #Locked {{ text-align: center; border: 1px dashed {a_mid}; color: {a}; padding: 8px 10px; }}
+    #Locked:hover {{ background: {a_soft}; }}
     #EffectRow {{ padding: 11px 14px; }}
     #IconBtn {{ padding: 7px; text-align: center; }}
     #WinBtn {{ border: none; padding: 6px 12px; color: {DIM}; text-align: center; background: transparent; }}

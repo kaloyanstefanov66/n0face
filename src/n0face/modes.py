@@ -24,15 +24,15 @@ class Mode:
 MODES = {
     "mask": Mode(
         name="mask",
-        effects=("mesh", "led", "circuit", "hex"),
+        effects=("mesh", "x"),  # n0face PRO adds more (see n0face.plugins)
         geometry=True,
         margin=0.15,
         forehead=0.3,
         silhouette="hull",
         hold_frames=6,
         hud=True,
-        claim="DECORATIVE. Replaces face pixels but renders your facial geometry and expressions. "
-        "Not identity protection.",
+        claim="DECORATIVE. Shows a heavy blur of your face under the mask (or a solid backing) and "
+        "renders your facial geometry and expressions. Not identity protection.",
     ),
     "obfuscate": Mode(
         name="obfuscate",

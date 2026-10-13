@@ -21,16 +21,34 @@ def face() -> np.ndarray:
     return lm.astype(np.float32)
 
 
+@pytest.fixture
+def head():
+    """Pose head keypoints (n0face.heads.Head) of a frontal canonical face at (320, 250),
+    about 190 px wide. Needs the face model file (the canonical mesh lives in it)."""
+    from n0face.detector import DEFAULT_MODEL
+    from n0face.heads import Head, _canonical
+
+    if not DEFAULT_MODEL.exists():
+        pytest.skip("model not downloaded")
+    _, ref = _canonical()
+    return Head((np.array([320.0, 250.0]) + ref[:, :2] * 12).astype(np.float32))
+
+
 class FakeDetector:
-    """Stands in for the MediaPipe detectors. `faces` is a list, or a callable(call_index)."""
+    """Stands in for the MediaPipe detectors. `faces` is a list, or a callable(call_index);
+    `heads` likewise (people found by pose without a face mesh)."""
 
     edges = np.random.default_rng(1).integers(0, 478, size=(800, 2))
 
-    def __init__(self, faces):
+    def __init__(self, faces, heads=()):
         self.faces = faces
+        self.heads = heads
         self.calls = 0
 
     def detect(self, frame, timestamp_ms=0, **_):
-        result = self.faces(self.calls) if callable(self.faces) else self.faces
+        from n0face.detector import Found
+
+        faces = self.faces(self.calls) if callable(self.faces) else self.faces
+        heads = self.heads(self.calls) if callable(self.heads) else self.heads
         self.calls += 1
-        return result
+        return Found(list(faces), list(heads))

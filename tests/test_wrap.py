@@ -18,17 +18,17 @@ def real_face():
 
 
 @pytest.fixture
-def cpu_wrap():
+def wrap_on():
     from n0face import wrap
 
-    old = (wrap.config.enabled, wrap.config.backend)
-    wrap.config.enabled, wrap.config.backend = True, "cpu"
+    old = wrap.config.enabled
+    wrap.config.enabled = True
     yield
-    wrap.config.enabled, wrap.config.backend = old
+    wrap.config.enabled = old
 
 
-@pytest.mark.parametrize("name", ["mesh", "led", "circuit", "hex"])
-def test_wrapped_mask_hugs_face_without_a_panel(name, real_face, cpu_wrap):
+@pytest.mark.parametrize("name", ["mesh", "x"])
+def test_wrapped_mask_hugs_face_without_a_panel(name, real_face, wrap_on):
     from n0face.detector import _tesselation
     from n0face.effects import make_effects
     from n0face.mask import build_mask
@@ -55,18 +55,18 @@ def test_wrapped_mask_hugs_face_without_a_panel(name, real_face, cpu_wrap):
 
 
 @pytest.mark.parametrize("wrapped", [True, False])
-@pytest.mark.parametrize("name", ["circuit", "hex"])
+@pytest.mark.parametrize("name", ["x"])
 def test_preview_shows_textured_masks_not_a_black_panel(name, wrapped):
     """Regression: CIRCUIT/HEX rendered as a plain black panel in the 3D preview."""
     from n0face import wrap
     from n0face.app.preview3d import MaskScene, Pose
     from n0face.theme import DEFAULT_THEME
 
-    old = (wrap.config.enabled, wrap.config.backend)
-    wrap.config.enabled, wrap.config.backend = wrapped, "cpu"
+    old = wrap.config.enabled
+    wrap.config.enabled = wrapped
     try:
         frame = MaskScene().render(320, 300, name, "mask", DEFAULT_THEME, 1.0, Pose(0.4, 0.1))
     finally:
-        wrap.config.enabled, wrap.config.backend = old
+        wrap.config.enabled = old
     lit = (frame.image[..., :3].max(axis=2) > 150).sum()
     assert lit > 200  # glowing eye slits / traces / plates, not just a dark panel

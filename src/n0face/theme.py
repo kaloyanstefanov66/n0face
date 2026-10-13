@@ -15,5 +15,6 @@ THEMES = {
     "amber": Theme(primary=(0, 176, 255), accent=(60, 60, 255)),
     "matrix": Theme(primary=(90, 255, 90), accent=(230, 255, 230)),
     "volt": Theme(primary=(70, 245, 225), accent=(200, 40, 255)),
+    "toxic": Theme(primary=(40, 240, 140), accent=(235, 235, 235)),  # acid green and white paint
 }
 DEFAULT_THEME = THEMES["cyan"]

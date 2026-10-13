@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QAbstractButton, QGraphicsOpacityEffect, QSizePoli
 
 from n0face.app import motion
 from n0face.app.motion import BOUNCY, SMOOTH, SNAPPY, Spring, mix
-from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, WARN, mono, with_alpha
+from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, WARN, graffiti, mono, spray_text, with_alpha
 
 ACCENT = QColor("#28e6ff")  # replaced at runtime by set_accent()
 INK = QColor("#061015")  # text/glyph color on accent fills
@@ -85,20 +85,19 @@ class SectionHeader(QWidget):
     def __init__(self, index: int, title: str):
         super().__init__()
         self.index, self.title = index, title
-        self.setFixedHeight(24)
+        self.setFixedHeight(32)
 
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setFont(mono(9.5, bold=True, spacing=2.0))
-        y = 16
+        y = 22
         p.setPen(ACCENT)
         idx = f"[{self.index:02d}]"
         p.drawText(0, y, idx)
-        x = p.fontMetrics().horizontalAdvance(idx) + 10
-        p.setPen(QColor(TEXT))
-        p.drawText(x, y, self.title)
-        x += p.fontMetrics().horizontalAdvance(self.title) + 14
+        x = p.fontMetrics().horizontalAdvance(idx) + 12
+        # The title is sprayed on, a little crooked.
+        x += spray_text(p, QPointF(x, y + 1), self.title.lower(), graffiti(15), QColor(TEXT), -2, glow=24) + 14
         p.setPen(QPen(QColor(FAINT), 1))
         for i in range(8):
             p.drawLine(QPointF(x + i * 5, y), QPointF(x + i * 5 + 5, y - 9))
@@ -649,9 +648,11 @@ class ActionButton(Animated):
 
         p.setPen(QPen(color, 2))
         brackets(p, r, 12 + 4 * h)
-        p.setFont(mono(11, bold=True, spacing=3.0))
-        p.setPen(color)
-        p.drawText(r, Qt.AlignmentFlag.AlignCenter, self.text())
+        font = graffiti(17)
+        p.setFont(font)
+        label = self.text().lower()
+        w = p.fontMetrics().horizontalAdvance(label)
+        spray_text(p, QPointF(r.center().x() - w / 2, r.center().y() + 8), label, font, color, -2, glow=40)
         p.setFont(mono(11))
         p.drawText(QRectF(r.left() + 18, r.top(), 20, r.height()), Qt.AlignmentFlag.AlignVCenter, "[")
         cx, cy = r.right() - 26 + 5 * h, r.center().y()
@@ -748,6 +749,110 @@ class Swatch(Animated):
             p.setBrush(Qt.BrushStyle.NoBrush)
             grow = 4 * (1 - min(c, 1))
             p.drawRect(ring.adjusted(grow, grow, -grow, -grow))
+
+
+class AccessoryTile(Animated):
+    """A square picker tile: the accessory's icon over its name, lit when chosen."""
+
+    def __init__(self, kind: str, icon_for):
+        super().__init__()
+        self.kind = kind
+        self._icon_for = icon_for  # (kind, px, QColor) -> QImage, re-asked when the accent changes
+        self._cache: tuple | None = None
+        self.setCheckable(True)
+        self.setFixedSize(108, 92)
+        self.setToolTip(kind.upper())
+
+    def _icon(self, px: int):
+        key = (px, ACCENT.rgb())
+        if self._cache is None or self._cache[0] != key:
+            self._cache = (key, self._icon_for(self.kind, px, QColor(ACCENT)))
+        return self._cache[1]
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        c, h = self.check.value, self.hover.value
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.setPen(QPen(blend(blend(QColor(LINE_STRONG), with_alpha(ACCENT, 110), h), ACCENT, c), 1 + c))
+        p.setBrush(with_alpha(ACCENT, int(6 * h + 20 * c)))
+        p.drawRect(r)
+        lift = 2 * self.press.value
+        px = 52
+        p.setOpacity(0.55 + 0.45 * max(c, h))
+        p.drawImage(QPointF(r.center().x() - px / 2, 8 + lift), self._icon(px))
+        p.setOpacity(1)
+        p.setFont(mono(7.5, spacing=1.6))
+        p.setPen(blend(QColor(DIM), ACCENT, c))
+        p.drawText(QRectF(r.left(), r.bottom() - 26, r.width(), 20), Qt.AlignmentFlag.AlignCenter, self.kind.upper())
+
+
+class Slider(QWidget):
+    """A thin track with an accent fill and a knob that springs to where you drag it."""
+
+    changed = Signal(float)
+
+    def __init__(self, lo: float, hi: float, value: float, fmt=lambda v: f"{v:.1f}"):
+        super().__init__()
+        self.lo, self.hi, self.fmt = lo, hi, fmt
+        self.value = value
+        self.knob = Spring(self._frac(value), SNAPPY, self.update)
+        self.hover = Spring(0, SNAPPY, self.update)
+        self.setFixedHeight(28)
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def _frac(self, v: float) -> float:
+        return (v - self.lo) / (self.hi - self.lo)
+
+    def set_value(self, v: float, emit: bool = False) -> None:
+        v = min(max(v, self.lo), self.hi)
+        self.value = v
+        self.knob.to(self._frac(v)) if self.isVisible() else self.knob.snap(self._frac(v))
+        if emit:
+            self.changed.emit(v)
+        self.update()
+
+    def _track(self) -> tuple[float, float]:
+        return 8.0, self.width() - 56.0
+
+    def _from_x(self, x: float) -> None:
+        a, b = self._track()
+        self.set_value(self.lo + (self.hi - self.lo) * min(max((x - a) / (b - a), 0), 1), emit=True)
+
+    def mousePressEvent(self, e):
+        self._from_x(e.position().x())
+
+    def mouseMoveEvent(self, e):
+        if e.buttons() & Qt.MouseButton.LeftButton:
+            self._from_x(e.position().x())
+
+    def mouseDoubleClickEvent(self, e):  # double-click resets to the middle / default
+        self.set_value(self.lo + (self.hi - self.lo) / 2 if self.lo < 0 else 1.0, emit=True)
+
+    def enterEvent(self, e):
+        self.hover.to(1)
+
+    def leaveEvent(self, e):
+        self.hover.to(0)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        a, b = self._track()
+        y = self.height() / 2
+        p.setPen(QPen(QColor(LINE_STRONG), 2))
+        p.drawLine(QPointF(a, y), QPointF(b, y))
+        x = a + (b - a) * self.knob.value
+        p.setPen(QPen(ACCENT, 2))
+        p.drawLine(QPointF(a, y), QPointF(x, y))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(ACCENT)
+        r = 5 + 1.5 * self.hover.value
+        p.drawEllipse(QPointF(x, y), r, r)
+        p.setFont(mono(8, spacing=1.0))
+        p.setPen(QColor(TEXT))
+        p.drawText(QRectF(b + 8, 0, 48, self.height()), Qt.AlignmentFlag.AlignVCenter, self.fmt(self.value))
 
 
 class AnimatedStack(QStackedWidget):

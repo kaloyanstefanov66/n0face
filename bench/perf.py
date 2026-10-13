@@ -74,9 +74,10 @@ def main() -> None:
             except EOFError:
                 break
             t0 = time.perf_counter()
-            faces = detector.detect(frame, int((t0 - start) * 1000))
+            found = detector.detect(frame, int((t0 - start) * 1000))
+            faces = found.faces
             t1 = time.perf_counter()
-            _, lost = anonymize(frame, faces, tracker, mode, effect, t1 - start)
+            _, lost = anonymize(frame, faces, tracker, mode, effect, t1 - start, heads=found.heads)
             t2 = time.perf_counter()
             detect_ms.append((t1 - t0) * 1000)
             render_ms.append((t2 - t1) * 1000)

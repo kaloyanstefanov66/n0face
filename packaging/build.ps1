@@ -1,15 +1,18 @@
 # Build the n0face Windows installer: icon -> PyInstaller bundle -> Inno Setup installer.
-# Usage (from the repo root):  powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+# Usage (from the repo root):  powershell -ExecutionPolicy Bypass -File packaging\build.ps1 [-Edition pro]
 # Output: dist\n0face\n0face.exe (portable folder) and dist\n0face-setup-<version>.exe
+# With -Edition pro (needs n0face-pro installed in .venv): dist\n0face-pro-setup-<version>.exe
 
+param([ValidateSet("free", "pro")][string]$Edition = "free")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $python = Join-Path $root ".venv\Scripts\python.exe"
 
-if (-not (Test-Path "models\face_landmarker.task")) { & $python scripts\get_model.py }
+if (-not ((Test-Path "models\face_landmarker.task") -and (Test-Path "models\pose_landmarker.task"))) { & $python scripts\get_model.py }
 & $python packaging\make_icon.py
 
+$env:N0FACE_EDITION = $Edition
 & $python -m PyInstaller packaging\n0face.spec --noconfirm --clean --distpath dist --workpath build
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
@@ -19,7 +22,8 @@ $iscc = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 not found (winget install JRSoftware.InnoSetup)" }
-& $iscc "/DAppVersion=$version" packaging\n0face.iss
+& $iscc "/DAppVersion=$version" "/DEdition=$Edition" packaging\n0face.iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
-Get-Item "dist\n0face-setup-$version.exe" | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }
+$name = if ($Edition -eq "pro") { "n0face-pro-setup-$version.exe" } else { "n0face-setup-$version.exe" }
+Get-Item "dist\$name" | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }

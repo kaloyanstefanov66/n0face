@@ -20,17 +20,21 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from n0face.detector import Found
 from n0face.effects import make_effects
 from n0face.hud import Hud
 from n0face.mask import build_mask
 from n0face.modes import MODES
 from n0face.pipeline import render_safe
+from n0face.smooth import steady
 from n0face.theme import DEFAULT_THEME, Theme
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".wmv"}
 SUFFIX = ".n0face"
 MISS_POLICIES = ("hide", "keep")
+SMOOTH_SECONDS = 0.1  # video: drawn masks are steadied over this much time either side
+SMOOTH_SIGMA = 0.04  # ...weighted by a Gaussian this wide (seconds)
 TILE_EVERY = 4  # video: run the tiled small-face scan on every Nth frame (must be <= window)
 NO_FACE_TEXT = "NO FACE FOUND // HIDDEN"
 
@@ -177,17 +181,19 @@ class MediaProcessor:
 
     # ---- shared ---------------------------------------------------------------------------
 
-    def _mask(self, faces: list[np.ndarray], shape) -> np.ndarray:
+    def _mask(self, found: Found, shape) -> np.ndarray:
         m = self.mode
-        return build_mask(faces, shape, margin=m.margin, forehead=m.forehead, silhouette=m.silhouette)
+        return build_mask(found.faces, shape, margin=m.margin, forehead=m.forehead, silhouette=m.silhouette,
+                          heads=found.heads, head_fit=m.geometry)
 
-    def _render(self, frame, mask_faces, draw_faces, t, report) -> np.ndarray:
+    def _render(self, frame, mask_found: Found, draw: Found, t, report) -> np.ndarray:
+        """`mask_found` decides what is covered; `draw` is what the mask design is drawn on."""
         report.frames += 1
-        report.max_faces = max(report.max_faces, len(draw_faces))
-        if mask_faces:
+        report.max_faces = max(report.max_faces, len(draw.faces) + sum(not h.has_face for h in draw.heads))
+        if mask_found:
             report.frames_with_faces += 1
-            return render_safe(frame, self._mask(mask_faces, frame.shape[:2]), draw_faces, False,
-                               self.mode, self.effect, t, self.hud)
+            return render_safe(frame, self._mask(mask_found, frame.shape[:2]), draw.faces, False,
+                               self.mode, self.effect, t, self.hud, heads=draw.heads)
         if self.on_miss == "keep":
             report.kept_unmasked_frames += 1
             return frame.copy()
@@ -199,16 +205,16 @@ class MediaProcessor:
         """Process a single frame exactly as a photo would be, without writing anything."""
         return self.render_frame(frame, self.detector.detect(frame))
 
-    def render_frame(self, frame: np.ndarray, faces: list[np.ndarray]) -> np.ndarray:
-        """Render a frame from already-detected faces (used by the cached app preview)."""
-        return self._render(frame, faces, faces, 0.0, Report(input=Path()))
+    def render_frame(self, frame: np.ndarray, found: Found) -> np.ndarray:
+        """Render a frame from an earlier detection (used by the cached app preview)."""
+        return self._render(frame, found, found, 0.0, Report(input=Path()))
 
     # ---- photos ---------------------------------------------------------------------------
 
     def _image(self, src: Path, dst: Path, report: Report) -> None:
         img = read_image(src)
-        faces = self.detector.detect(img)
-        out = self._render(img, faces, faces, 0.0, report)
+        found = self.detector.detect(img)
+        out = self._render(img, found, found, 0.0, report)
         write_image(dst, out)
         self.progress(1.0, out)
 
@@ -222,22 +228,28 @@ class MediaProcessor:
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
         sink = None
         k = self.window
-        pending: deque[tuple[np.ndarray, list]] = deque()
-        history: deque[list] = deque(maxlen=k)
+        # The privacy mask is the union over +-k frames; drawn masks are steadied over a
+        # longer look either way, so keep enough frames around for both.
+        look = max(k, round(SMOOTH_SECONDS * fps))
+        pending: deque[tuple[np.ndarray, Found]] = deque()
+        history: deque[Found] = deque(maxlen=look)
         frames_read = 0
 
         def emit():
             nonlocal sink
-            frame, faces = pending.popleft()
-            window = [*history, faces, *(f for _, f in pending)]
-            union = [lm for fl in window for lm in fl]
-            # Draw this frame's own faces; if it had none, borrow the nearest neighbor's.
-            draw = faces or next((fl for fl in nearest_neighbors(history, pending) if fl), [])
+            frame, found = pending.popleft()
+            past, future = list(history)[::-1], [f for _, f in pending]  # nearest first
+            union = Found.union([*past[:k], found, *future[:k]])
+            # Draw on this frame's own faces and heads; if it had none, borrow the nearest neighbor's.
+            draw = found or next((f for f in interleave(past[:k], future[:k]) if f), Found())
+            if self.mode.geometry:
+                neighbors = [(-(i + 1), f) for i, f in enumerate(past)] + [(i + 1, f) for i, f in enumerate(future)]
+                draw = steady(draw, neighbors, SMOOTH_SIGMA * fps)
             out = self._render(frame, union, draw, report.frames / fps, report)
             if sink is None:
                 sink = self._open_sink(src, dst, out.shape[1], out.shape[0], fps, report)
             sink.write(out)
-            history.append(faces)
+            history.append(found)
             if report.frames % 5 == 0:
                 self.progress(min(report.frames / total, 1.0) if total else 0.0, out)
 
@@ -253,7 +265,7 @@ class MediaProcessor:
                 tile_now = frames_read % TILE_EVERY == 0
                 pending.append((frame, self.detector.detect(frame, tiles=tile_now)))
                 frames_read += 1
-                if len(pending) > k:
+                if len(pending) > look:
                     emit()
             while pending:
                 emit()
@@ -341,10 +353,9 @@ class _OpenCVSink:
         self.dst.unlink(missing_ok=True)
 
 
-def nearest_neighbors(history: deque, pending: deque):
-    """Neighbor face lists ordered by distance from the current frame: next, previous, ..."""
-    past = list(history)[::-1]
-    future = [f for _, f in pending]
+def interleave(past: list, future: list):
+    """Neighbors ordered by distance from the current frame: next, previous, ... (both lists
+    nearest first)."""
     for i in range(max(len(past), len(future))):
         if i < len(future):
             yield future[i]

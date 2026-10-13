@@ -1,4 +1,4 @@
-"""Mask designs that only exist as textures: flat stickers, or wrapped around the face in 3D."""
+"""Mask designs that only exist as designs: flat stickers, or wrapped around the face in 3D."""
 
 from n0face.effects.base import PANEL, Effect
 from n0face.theme import DEFAULT_THEME, Theme
@@ -15,15 +15,8 @@ class TexturedEffect(Effect):
         return PANEL.render(h, w, faces, t, rng)
 
 
-class CircuitEffect(TexturedEffect):
-    """Glowing circuit traces with data pulses running along them; eye slits and mouth glow."""
+class XEffect(TexturedEffect):
+    """Graffiti purge mask: painted X eyes and a stitched-shut grin, with paint drips."""
 
-    name = "circuit"
-    wrap_design = "circuit"
-
-
-class HexEffect(TexturedEffect):
-    """Hexagonal armor plates with a scanning wave; lit eye slits follow your blinks."""
-
-    name = "hex"
-    wrap_design = "hex"
+    name = "x"
+    wrap_design = "x"

@@ -46,4 +46,4 @@ def test_theme_switch_keeps_session_tag():
     engine = Engine(FakeDetector([]))
     session = engine.hud.session
     engine.set_theme(THEMES["amber"])
-    assert engine.hud.session == session and engine.effects["led"].theme == THEMES["amber"]
+    assert engine.hud.session == session and engine.effects["x"].theme == THEMES["amber"]

@@ -30,7 +30,7 @@ def test_gui_entry_point_builds_window(monkeypatch):
     monkeypatch.setattr(app_window, "QSettings", lambda *a: QSettings("n0face-test", "n0face"))
 
     app.setWindowIcon(app_main.make_icon())
-    window, detector = app_main.build_window()
+    window, detector = app_main.build_window(load_plugins=False)
     try:
         window.show()
         app.processEvents()

@@ -4,9 +4,10 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, QSettings, Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QKeySequence, QPainter, QPen, QRegion, QShortcut
+from PySide6.QtGui import QColor, QDesktopServices, QImage, QKeySequence, QPainter, QPen, QRegion, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QGridLayout,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -22,11 +23,12 @@ from PySide6.QtWidgets import (
 from n0face.app import motion
 from n0face.app.background import Ambient
 from n0face.app.services import PreviewRequest, PreviewService
-from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, accent_color, mono, stylesheet
+from n0face.app.style import DIM, FAINT, LINE_STRONG, LIVE, OK, TEXT, accent_color, graffiti, mono, spray_text, stylesheet
 from n0face.app.viewport import Viewport
 from n0face.app.widgets import (
     ACCENT,
     ActionButton,
+    AccessoryTile,
     AnimatedStack,
     Callout,
     ChoiceRow,
@@ -34,6 +36,7 @@ from n0face.app.widgets import (
     FileRow,
     SectionHeader,
     Segmented,
+    Slider,
     StatusRow,
     Swatch,
     TabBar,
@@ -46,7 +49,7 @@ from n0face.media import IMAGE_EXTS, VIDEO_EXTS, collect_inputs, ffmpeg_path, me
 from n0face.modes import MODE_NAMES, MODES
 from n0face.pipeline import Engine, Stats
 from n0face.theme import THEMES
-from n0face import wrap
+from n0face import glitch, plugins, wrap
 
 CAMERA_SLOTS = 4
 FILE_FILTER = "Photos and videos ({})".format(" ".join(f"*{e}" for e in sorted(IMAGE_EXTS | VIDEO_EXTS)))
@@ -81,25 +84,21 @@ class TitleBar(QFrame):
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        y = 36
-        p.setFont(mono(20, bold=True, spacing=1.0))
-        p.setPen(QColor(TEXT))
-        # Wordmark as in the logo: "n0" in the accent color, "face" in white.
-        p.setPen(ACCENT)
-        p.drawText(24, y, "n0")
-        x = 24 + p.fontMetrics().horizontalAdvance("n0")
-        p.setPen(QColor(TEXT))
-        p.drawText(x, y, "face")
-        x += p.fontMetrics().horizontalAdvance("face") + 24
+        y = 40
+        # Wordmark, sprayed on: "n0" in the accent color, "face" in white.
+        font = graffiti(25)
+        x = 24 + spray_text(p, QPointF(24, y), "n0", font, ACCENT, -3)
+        x += spray_text(p, QPointF(x, y - 1), "face", font, QColor(TEXT), -3, glow=30) + 26
         p.setPen(QPen(QColor(LINE_STRONG), 1))
         p.drawLine(QPointF(x, 16), QPointF(x, 40))
         p.setFont(mono(9, spacing=2.6))
         p.setPen(QColor(DIM))
-        p.drawText(x + 24, y - 4, "LOCAL FACE PRIVACY")
-        tag = "// SEE WITHOUT BEING SEEN"
-        p.setFont(mono(8, spacing=2.0))
+        p.drawText(int(x + 24), y - 8, "LOCAL FACE PRIVACY")
+        tag = "privacy is a choice"
+        tag_font = graffiti(14)
+        p.setFont(tag_font)
         w = p.fontMetrics().horizontalAdvance(tag)
-        p.drawText(int(self.width() - SIDEBAR_WIDTH - 64 - w), y - 4, tag)
+        spray_text(p, QPointF(self.width() - SIDEBAR_WIDTH - 64 - w, y - 4), tag, tag_font, ACCENT, -5)
         p.setPen(QPen(QColor(LINE_STRONG), 1))
         p.drawLine(QPointF(0, self.height() - 1), QPointF(self.width(), self.height() - 1))
 
@@ -176,6 +175,27 @@ def page() -> tuple[QScrollArea, QVBoxLayout]:
     scroll.setWidgetResizable(True)
     scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     return scroll, lay
+
+
+def lock_icon(_kind: str, px: int, color: QColor) -> QImage:
+    """A padlock, for locked PRO tiles."""
+    img = QImage(px, px, QImage.Format.Format_ARGB32_Premultiplied)
+    img.fill(0)
+    p = QPainter(img)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(QPen(color, max(px / 16, 1.5)))
+    w, h = px * 0.46, px * 0.34
+    body = QRectF((px - w) / 2, px * 0.48, w, h)
+    p.drawRoundedRect(body, 2, 2)
+    p.drawArc(QRectF(px / 2 - w * 0.3, px * 0.2, w * 0.6, w * 0.7), 0, 180 * 16)
+    p.drawLine(QPointF(px / 2 - w * 0.3, px * 0.2 + w * 0.35), QPointF(px / 2 - w * 0.3, px * 0.48))
+    p.drawLine(QPointF(px / 2 + w * 0.3, px * 0.2 + w * 0.35), QPointF(px / 2 + w * 0.3, px * 0.48))
+    p.end()
+    return img
+
+
+def open_pro_page() -> None:
+    QDesktopServices.openUrl(QUrl(plugins.PRO_URL))
 
 
 def label(text: str, name: str = "Dim", size: float = 8.5) -> QLabel:
@@ -272,7 +292,10 @@ class MainWindow(QWidget):
             self.engine.set_mode(mode, self.settings.value("effect", None, type=str))
         self.engine.hud_enabled = self.settings.value("hud", True, type=bool)
         wrap.config.enabled = self.settings.value("wrap", False, type=bool)
-        wrap.config.backend = self.settings.value("renderer", "auto", type=str)
+        glitch.config.enabled = self.settings.value("glitch", False, type=bool)
+        for key in ("intensity", "frequency", "length"):
+            setattr(glitch.config, key, self.settings.value(f"glitch_{key}", 1.0, type=float))
+        wrap.config.backing = self.settings.value("backing", "blur", type=str)
 
     def _restore_geometry(self) -> None:
         geo = self.settings.value("geometry")
@@ -288,7 +311,10 @@ class MainWindow(QWidget):
         s.setValue("effect", self.engine.effect_name)
         s.setValue("hud", self.engine.hud_enabled)
         s.setValue("wrap", wrap.config.enabled)
-        s.setValue("renderer", wrap.config.backend)
+        s.setValue("glitch", glitch.config.enabled)
+        for key in ("intensity", "frequency", "length"):
+            s.setValue(f"glitch_{key}", getattr(glitch.config, key))
+        s.setValue("backing", wrap.config.backing)
         s.setValue("auto_rotate", self.rotate_toggle.isChecked())
         s.setValue("reduce_motion", motion.reduced_motion())
         s.setValue("tab", self.tabs.current)
@@ -374,9 +400,9 @@ class MainWindow(QWidget):
         bind("R", self.viewport.reset_view)
         bind("?", lambda: self.viewport.toggle_help())
         bind("Shift+/", lambda: self.viewport.toggle_help())
-        for i in range(4):
+        for i in range(len(self.tabs.labels)):
             bind(f"Ctrl+{i + 1}", lambda i=i: self.tabs.set_current(i))
-        for i in range(4):
+        for i in range(9):
             bind(str(i + 1), lambda i=i: self._effect_by_index(i))
 
     def _primary(self) -> None:
@@ -409,10 +435,10 @@ class MainWindow(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
-        self.tabs = TabBar(["SOURCE", "MASK", "LOOK", "SYSTEM"])
+        self.tabs = TabBar(["SOURCE", "MASK", "GEAR", "LOOK", "SYSTEM"])
         lay.addWidget(self.tabs)
         self.pages = AnimatedStack()
-        for build in (self._page_source, self._page_mask, self._page_look, self._page_system):
+        for build in (self._page_source, self._page_mask, self._page_gear, self._page_look, self._page_system):
             self.pages.addWidget(build())
         self.tabs.changed.connect(self.pages.slide_to)
         lay.addWidget(self.pages, 1)
@@ -516,20 +542,98 @@ class MainWindow(QWidget):
         lay.addSpacing(16)
         lay.addWidget(SectionHeader(4, "EFFECT"))
         self.effect_group = QButtonGroup(self)
+        self.locked_rows: list[ChoiceRow] = []
         self.effect_box = QVBoxLayout()
         self.effect_box.setSpacing(8)
         lay.addLayout(self.effect_box)
         lay.addSpacing(8)
-        self.wrap_toggle = Toggle("3D WRAP", "(hugs the face; hair & ears stay visible)")
+        self.wrap_toggle = Toggle("3D WRAP", "(hugs the face)")
+        self.wrap_toggle.setToolTip("The mask follows your face in 3D; hair and ears stay visible.")
         self.wrap_toggle.setChecked(wrap.config.enabled)
         self.wrap_toggle.toggled.connect(self._toggle_wrap)
         lay.addWidget(self.wrap_toggle)
+        self.glitch_toggle = Toggle("GLITCH", "(random bursts)")
+        self.glitch_toggle.setToolTip("Every couple of seconds the mask tears, warps and splits for a moment.")
+        self.glitch_toggle.setChecked(glitch.config.enabled)
+        self.glitch_toggle.toggled.connect(self._toggle_glitch)
+        lay.addWidget(self.glitch_toggle)
+        # Its knobs (n0face PRO) show while it's on.
+        self.glitch_opts = QWidget()
+        opts = QVBoxLayout(self.glitch_opts)
+        opts.setContentsMargins(52, 0, 0, 4)
+        opts.setSpacing(2)
+        knobs = () if not plugins.has("glitch_knobs") else (
+            ("intensity", "INTENSITY", 0.25, 2.0, "How hard each burst tears the mask."),
+            ("frequency", "FREQUENCY", 0.25, 3.0, "How often bursts come (1x: about one every two seconds)."),
+            ("length", "LENGTH", 0.5, 2.0, "How long each burst lasts."),
+        )
+        for key, name, lo, hi, tip in knobs:
+            row = QHBoxLayout()
+            name_lbl = label(name, "Dim", 7.5)
+            name_lbl.setFixedWidth(84)
+            row.addWidget(name_lbl)
+            slider = Slider(lo, hi, getattr(glitch.config, key), lambda v: f"{v:.2f}x")
+            slider.setToolTip(tip)
+            slider.changed.connect(lambda v, k=key: self._set_glitch_option(k, v))
+            row.addWidget(slider, 1)
+            opts.addLayout(row)
+        if not knobs:
+            locked = QPushButton("INTENSITY \u00b7 FREQUENCY \u00b7 LENGTH   PRO")
+            locked.setObjectName("Locked")
+            locked.setFont(mono(7.5, spacing=1.4))
+            locked.setToolTip("Tune glitch bursts with n0face PRO.")
+            locked.clicked.connect(open_pro_page)
+            opts.addWidget(locked)
+        self.glitch_opts.setVisible(glitch.config.enabled)
+        lay.addWidget(self.glitch_opts)
+        self.hud_toggle = Toggle("STATUS HUD", "(ID / CONF box)")
+        self.hud_toggle.setToolTip("The ID / CONF / STATUS MASKED box, bounding box and tracking lines.")
+        self.hud_toggle.setChecked(self.engine.hud_enabled)
+        self.hud_toggle.toggled.connect(self._toggle_hud)
+        lay.addWidget(self.hud_toggle)
+        lay.addSpacing(8)
+        lay.addWidget(label("UNDER THE MASK", "Dim", 7.5))
+        self.backing_seg = Segmented([("blur", "BLUR"), ("solid", "SOLID")])
+        self.backing_seg.set_value(wrap.config.backing, animate=False)
+        self.backing_seg.setToolTip("Mask mode: a heavy blur of your face under the design, or a solid backing.")
+        self.backing_seg.changed.connect(self._set_backing)
+        lay.addWidget(self.backing_seg)
+        lay.addStretch()
+        return scroll
+
+    def _page_gear(self) -> QWidget:
+        build = plugins.registry.pages.get("gear")
+        if build is not None:
+            return build(self)
+        scroll, lay = page()
+        lay.addWidget(SectionHeader(5, "ACCESSORIES"))
+        lay.addWidget(label("n0face PRO. Horns, halo, crown and more, riding on your head in 3D.", "Dim", 7.5))
+        grid = QGridLayout()
+        grid.setSpacing(8)
+        for i, kind in enumerate(plugins.PRO_ACCESSORIES):
+            tile = AccessoryTile(kind, lock_icon)
+            tile.setCheckable(False)
+            tile.setToolTip(f"{kind.upper()} \u00b7 n0face PRO")
+            tile.clicked.connect(open_pro_page)
+            grid.addWidget(tile, i // 3, i % 3)
+        lay.addLayout(grid)
+        lay.addSpacing(16)
+        lay.addWidget(SectionHeader(6, "CUSTOMIZE"))
+        lay.addWidget(label(
+            "n0face PRO. Recolour each part of a mask (eyes, mouth, lines, accents, base), swap "
+            "eye and mouth styles, set stroke and glow, tune GLITCH, and get five more masks: "
+            "LED, CIRCUIT, HEX, SKULL, WIREFRAME.", "Dim", 7.5))
+        get = QPushButton("GET n0face PRO")
+        get.setObjectName("Locked")
+        get.setFont(mono(9, spacing=2.4))
+        get.clicked.connect(open_pro_page)
+        lay.addWidget(get)
         lay.addStretch()
         return scroll
 
     def _page_look(self) -> QWidget:
         scroll, lay = page()
-        lay.addWidget(SectionHeader(5, "THEME"))
+        lay.addWidget(SectionHeader(7, "THEME"))
         row = QHBoxLayout()
         row.setSpacing(8)
         self.theme_group = QButtonGroup(self)
@@ -542,17 +646,13 @@ class MainWindow(QWidget):
         row.addStretch()
         lay.addLayout(row)
         lay.addSpacing(16)
-        lay.addWidget(SectionHeader(6, "OVERLAY"))
-        self.hud_toggle = Toggle("HUD OVERLAY", "(mask mode)")
-        self.hud_toggle.setChecked(self.engine.hud_enabled)
-        self.hud_toggle.toggled.connect(self._toggle_hud)
-        lay.addWidget(self.hud_toggle)
+        lay.addWidget(SectionHeader(8, "PREVIEW"))
         self.rotate_toggle = Toggle("AUTO-ROTATE PREVIEW")
         self.rotate_toggle.setChecked(self.auto_rotate)
         self.rotate_toggle.toggled.connect(self._toggle_rotate)
         lay.addWidget(self.rotate_toggle)
         lay.addSpacing(16)
-        lay.addWidget(SectionHeader(7, "MOTION"))
+        lay.addWidget(SectionHeader(9, "MOTION"))
         self.motion_toggle = Toggle("REDUCE MOTION")
         self.motion_toggle.setChecked(motion.reduced_motion())
         self.motion_toggle.setToolTip("Turns off transitions, drifting glows and idle animation.")
@@ -566,7 +666,7 @@ class MainWindow(QWidget):
 
     def _page_system(self) -> QWidget:
         scroll, lay = page()
-        lay.addWidget(SectionHeader(8, "STATUS"))
+        lay.addWidget(SectionHeader(10, "STATUS"))
         self.st_cam = StatusRow("CAMERA")
         self.st_stream = StatusRow("VIRTUAL CAM")
         self.st_net = StatusRow("NETWORK")
@@ -576,15 +676,7 @@ class MainWindow(QWidget):
         self.stream_note = label("", "Dim", 7.5)
         lay.addWidget(self.stream_note)
         lay.addSpacing(16)
-        lay.addWidget(SectionHeader(9, "RENDERER"))
-        self.renderer_seg = Segmented([("auto", "AUTO"), ("cpu", "CPU"), ("gpu", "GPU")])
-        self.renderer_seg.set_value(wrap.config.backend, animate=False)
-        self.renderer_seg.changed.connect(self._set_renderer)
-        lay.addWidget(self.renderer_seg)
-        self.renderer_note = label("used by 3D WRAP. GPU needs: pip install moderngl", "Dim", 7.5)
-        lay.addWidget(self.renderer_note)
-        lay.addSpacing(16)
-        lay.addWidget(SectionHeader(10, "LAST RUN"))
+        lay.addWidget(SectionHeader(11, "LAST RUN"))
         self.run_log = label("nothing processed yet", "Dim", 7.5)
         lay.addWidget(self.run_log)
         self.open_folder = QPushButton("OPEN OUTPUT FOLDER")
@@ -593,9 +685,9 @@ class MainWindow(QWidget):
         self.open_folder.clicked.connect(self._open_output_folder)
         lay.addWidget(self.open_folder)
         lay.addSpacing(16)
-        lay.addWidget(SectionHeader(11, "ABOUT"))
+        lay.addWidget(SectionHeader(12, "ABOUT"))
         lay.addWidget(label(
-            "Face detection runs on this device with a 3.8 MB local model. Network access is "
+            "Face and head detection run on this device with two local models. Network access is "
             "disabled while n0face runs. Nothing is uploaded, logged or recorded. Only display "
             "preferences are remembered between sessions, never file names or paths."))
         lay.addStretch()
@@ -627,6 +719,19 @@ class MainWindow(QWidget):
             row.clicked.connect(lambda _=False, n=name: self._select_effect(n))
             self.effect_group.addButton(row)
             self.effect_box.addWidget(row)
+        for b in self.locked_rows:
+            self.effect_box.removeWidget(b)
+            b.deleteLater()
+        self.locked_rows = []
+        if mode.name == "mask":
+            for name in (n for n in plugins.PRO_MASKS if n not in mode.effects):
+                row = ChoiceRow("·", name.upper(), "PRO")
+                row.setCheckable(False)
+                row.setEnabled(True)
+                row.setToolTip("n0face PRO")
+                row.clicked.connect(open_pro_page)
+                self.locked_rows.append(row)
+                self.effect_box.addWidget(row)
 
     def _select_effect(self, name: str) -> None:
         if name == self.engine.effect_name:
@@ -641,6 +746,8 @@ class MainWindow(QWidget):
     def _apply_theme(self, theme, initial: bool = False) -> None:
         self.engine.set_theme(theme)
         set_accent(accent_color(theme))
+        for hook in getattr(self, "theme_hooks", []):  # add-on pages that follow the theme
+            hook(theme)
         if initial or not hasattr(self, "_styled_for") or self._styled_for != theme:
             self.setStyleSheet(stylesheet(theme))
             self._styled_for = theme
@@ -655,14 +762,19 @@ class MainWindow(QWidget):
         self.viewport.style_changed()
         self._schedule_preview()
 
-    def _set_renderer(self, backend: str) -> None:
-        wrap.config.backend = backend
+    def _set_backing(self, backing: str) -> None:
+        wrap.config.backing = backing
+        self.viewport.style_changed()
         self._schedule_preview()
-        QTimer.singleShot(1500, self._show_renderer_status)
 
-    def _show_renderer_status(self) -> None:
-        name, detail = wrap.status()
-        self.renderer_note.setText(f"active: {name} \u00b7 {detail}")
+    def _toggle_glitch(self, on: bool) -> None:
+        glitch.config.enabled = on
+        self.glitch_opts.setVisible(on)
+        self._schedule_preview()
+
+    def _set_glitch_option(self, key: str, value: float) -> None:
+        setattr(glitch.config, key, value)
+        self._schedule_preview()
 
     def _toggle_hud(self, on: bool) -> None:
         self.engine.hud_enabled = on

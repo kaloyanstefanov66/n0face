@@ -15,9 +15,9 @@ class Effect:
     # True only for effects that derive output from face pixels (e.g. pixelate). Those are
     # weaker by construction and are excluded from the input-independence guarantee.
     uses_camera_pixels = False
-    # Mask-mode effects that can be drawn as a 3D-wrapped texture (see n0face.wrap). When the
-    # wrap option is on, or the effect only exists as a texture, apply() draws a dark panel over
-    # the mask and then the texture on each face mesh.
+    # Mask-mode effects with a design drawn on the face mesh (see n0face.designs). When the
+    # wrap option is on, or the effect only exists as a design, apply() draws the design on
+    # each face: wrapped in 3D, or flat on a dark panel over the mask.
     wrap_design: str | None = None
     always_textured = False
     theme = None
@@ -26,26 +26,42 @@ class Effect:
         """Return an (h, w, 3) BGR uint8 image. `faces` are in this region's coordinates."""
         raise NotImplementedError
 
-    def apply(self, frame: np.ndarray, mask: np.ndarray, faces: list[np.ndarray], t: float) -> np.ndarray:
+    def apply(self, frame: np.ndarray, mask: np.ndarray, faces: list[np.ndarray], t: float, cover=None,
+              blur: bool = False) -> np.ndarray:
+        """`cover` is a part of `mask` that must be fully covered even by a 3D-wrapped design
+        (heads whose face mesh is only estimated). With `blur` (mask mode) the face under the
+        design is a heavy blur of itself instead of a solid backing."""
         if self.wrap_design and faces:
             from n0face import wrap
 
             if self.always_textured or wrap.config.enabled:
-                return self._apply_textured(frame, mask, faces, t, wrap.config.enabled)
-        return self._apply_fill(frame, mask, faces, t)
+                return self._apply_textured(frame, mask, faces, t, wrap.config.enabled, cover, blur)
+        return self._apply_fill(frame, mask, faces, t, blur)
 
-    def _apply_textured(self, frame, mask, faces, t, wrapped: bool) -> np.ndarray:
-        from n0face import wrap
+    def _apply_textured(self, frame, mask, faces, t, wrapped: bool, cover=None, blur: bool = False) -> np.ndarray:
+        from n0face import designs
+        from n0face.mask import build_mask
 
-        # Flat stickers sit on a dark panel covering the whole mask region. A 3D-wrapped mask
-        # is drawn on its own so it hugs the face; its texture is fully opaque, so no face
-        # pixels show through wherever the mask covers.
-        out = frame.copy() if wrapped else PANEL.apply(frame, mask, [], t)
+        # Flat stickers sit on a backing covering the whole mask region. A 3D-wrapped mask is
+        # drawn on its own so it hugs the face; with a solid backing its surface is fully
+        # opaque, so no face pixels show through wherever it covers. `cover` gets the backing
+        # either way. A blurred backing keeps only a heavy blur of the face under the design.
+        if blur:
+            out = frame.copy()
+            region = mask if not wrapped else build_mask(faces, mask.shape, margin=0.0, forehead=0.0)
+            if wrapped and cover is not None:
+                region = region | cover
+            designs.blur_backing(out, region)
+        else:
+            out = frame.copy() if wrapped else PANEL.apply(frame, mask, [], t)
+            if wrapped and cover is not None:
+                out = PANEL.apply(out, cover, [], t)
         for lm in faces:
-            wrap.draw_face(out, lm, self.wrap_design, self.theme, t, wrapped)
+            designs.draw_face(out, lm, self.wrap_design, self.theme, t, wrapped, blur)
         return out
 
-    def _apply_fill(self, frame: np.ndarray, mask: np.ndarray, faces: list[np.ndarray], t: float) -> np.ndarray:
+    def _apply_fill(self, frame: np.ndarray, mask: np.ndarray, faces: list[np.ndarray], t: float,
+                    blur: bool = False) -> np.ndarray:
         # Deterministic per frame, so output depends only on (mask, faces, t).
         rng = np.random.default_rng(int(t * 30))
         fh, fw = mask.shape
@@ -61,6 +77,13 @@ class Effect:
         x1, y1 = min(bx + bw + FEATHER_PX, fw), min(by + bh + FEATHER_PX, fh)
         offset = np.array([x0, y0], dtype=np.float32)
         fill = self.render(y1 - y0, x1 - x0, [f - offset for f in faces], t, rng)
+        if blur:
+            # The effect is drawn on near-black, so adding it lays its light over the blur.
+            from n0face import designs
+
+            under = out[y0:y1, x0:x1].copy()
+            designs.blur_backing(under, np.full(under.shape[:2], 255, np.uint8))
+            fill = cv2.add(under, fill)
 
         # Soft edge outside the mask for looks; the mask interior is always fully opaque.
         core = mask[y0:y1, x0:x1]

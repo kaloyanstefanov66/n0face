@@ -16,11 +16,12 @@ import numpy as np
 
 from n0face import canonical
 from n0face.effects import make_effects
-from n0face.effects.led import L_INNER, L_OUTER, LIP_LOWER, LIP_UPPER, MOUTH_L, MOUTH_R, R_INNER, R_OUTER
 from n0face.effects.mesh import LINKS, NODES
 from n0face.theme import Theme
 
 CAMERA_DIST = 5.0
+ACCESSORY_ZOOM = 0.72  # with an accessory on, the head is drawn this much smaller...
+ACCESSORY_DROP = 1.2  # ...and centred this much lower (as a multiple of half the height)
 LIGHT = np.array([-0.35, 0.45, 1.0]) / np.linalg.norm([-0.35, 0.45, 1.0])
 DIM_DOT = (48, 40, 34)
 SKIN = np.array([110, 135, 170], dtype=np.float64)
@@ -116,53 +117,9 @@ class MaskScene:
         self.vert_normals = vn / np.maximum(np.linalg.norm(vn, axis=1, keepdims=True), 1e-9)
         self._effect_cache: dict = {}
         self.regions = _regions()
-        self._setup_led()
         self._setup_shell()
 
     # ---- setup --------------------------------------------------------------------------
-
-    def _setup_led(self) -> None:
-        v = self.v
-        l_eye = (v[L_OUTER] + v[L_INNER]) / 2
-        r_eye = (v[R_OUTER] + v[R_INNER]) / 2
-        self.iod = float(np.linalg.norm((r_eye - l_eye)[:2]))
-        self.led_pitch = self.iod / 10
-        xs = np.arange(-1.0, 1.0, self.led_pitch)
-        ys = np.arange(-1.1, 1.0, self.led_pitch)
-        gx, gy = np.meshgrid(xs, ys)
-        pts = np.stack([gx.ravel(), gy.ravel()], axis=1)
-
-        # Put each grid point on the front-most triangle under it (barycentric in the xy plane).
-        a, b, c = (v[self.tris[:, k]] for k in range(3))
-        best_z = np.full(len(pts), -np.inf)
-        best = np.full((len(pts), 3), np.nan)
-        best_tri = np.full(len(pts), -1)
-        for start in range(0, len(self.tris), 128):
-            sl = slice(start, start + 128)
-            a2, b2, c2 = a[sl, :2], b[sl, :2], c[sl, :2]
-            v0, v1 = b2 - a2, c2 - a2
-            d = v0[:, 0] * v1[:, 1] - v1[:, 0] * v0[:, 1]
-            d = np.where(np.abs(d) < 1e-12, 1e-12, d)
-            p = pts[:, None, :] - a2[None]
-            u = (p[..., 0] * v1[:, 1] - v1[:, 0] * p[..., 1]) / d
-            w = (v0[:, 0] * p[..., 1] - p[..., 0] * v0[:, 1]) / d
-            inside = (u >= 0) & (w >= 0) & (u + w <= 1)
-            z = a[sl, 2] + u * (b[sl, 2] - a[sl, 2]) + w * (c[sl, 2] - a[sl, 2])
-            z = np.where(inside, z, -np.inf)
-            j = z.argmax(axis=1)
-            zj = z[np.arange(len(pts)), j]
-            better = zj > best_z
-            best_z[better] = zj[better]
-            best_tri[better] = start + j[better]
-            best[better] = np.c_[pts[better], zj[better]]
-        keep = best_tri >= 0
-        self.led_points = best[keep]
-        self.led_tri = best_tri[keep]
-
-        # Eye and mouth geometry for the expression pattern.
-        self.led_eyes = [(v[o] + v[i]) / 2 for o, i in ((L_OUTER, L_INNER), (R_OUTER, R_INNER))]
-        cl, cr = v[MOUTH_L], v[MOUTH_R]
-        self.led_mouth = ((cl[0] + cr[0]) / 2, (v[LIP_UPPER][1] + v[LIP_LOWER][1]) / 2, abs(cr[0] - cl[0]) / 2 * 1.1)
 
     def _setup_shell(self) -> None:
         lat = np.linspace(-math.radians(75), math.radians(85), 15)
@@ -191,15 +148,32 @@ class MaskScene:
         self, w: int, h: int, effect: str, mode: str, theme: Theme, t: float,
         pose: Pose = Pose(), hover: tuple[float, float] | None = None, px: float = 1.0,
     ) -> Frame:
+        from n0face import plugins
+
         r = rotation(pose.yaw, pose.pitch)
         k = focal(w, h, pose.zoom)
+        # An overlay (accessories, mask mode) reaches well above the head: pull back and lower
+        # the head so it fits. `ph` only moves where things project; the canvas is still (w, h).
+        overlays = [o for o in plugins.registry.overlays if o.active()] if mode == "mask" else []
+        wearing = bool(overlays)
+        ph = h * ACCESSORY_DROP if wearing else h
+        if wearing:
+            k *= ACCESSORY_ZOOM
         lw = max(1, int(round(px)))
         geometry = self.shell_v if mode == "anonymize" else self.v
-        pr_all, p2_all = project_points(geometry, r, w, h, k)
+        pr_all, p2_all = project_points(geometry, r, w, ph, k)
+
+        def project_cm(points_cm):
+            """Canonical head cm -> (preview pixels, depth growing away from the camera)."""
+            pr_a, p2_a = project_points((np.asarray(points_cm) - self._center_cm) / self._scale_cm, r, w, ph, k)
+            return p2_a, -pr_a[:, 2]
+
+        reach = [project_cm(pts)[0] for o in overlays for pts in o.points_cm(t)]
 
         # Region of interest: the projected model, plus room for glow and the scan bar.
-        x0, y0 = p2_all.min(axis=0)
-        x1, y1 = p2_all.max(axis=0)
+        bounds = np.vstack([p2_all, *reach]) if reach else p2_all
+        x0, y0 = bounds.min(axis=0)
+        x1, y1 = bounds.max(axis=0)
         pad = 14 * px + 0.16 * (x1 - x0)
         rx0, ry0 = max(int(x0 - pad), 0), max(int(y0 - 14 * px), 0)
         rx1, ry1 = min(int(x1 + pad) + 1, w), min(int(y1 + 14 * px) + 1, h)
@@ -217,19 +191,33 @@ class MaskScene:
             if hover is not None:
                 info = {"hidden": True}
         else:
+            from n0face import wrap
+
+            blur = mode == "mask" and wrap.config.backing == "blur"
+            if blur:
+                self._skin_backing(panel, pr_all, p2, r)
             design = self._texture_design(effect, theme)
             if design is not None:
-                self._draw_texture(panel, pr_all, p2, r, k, shift, w, h, design, theme, t)
+                self._draw_texture(panel, pr_all, p2, r, k, shift, w, ph, design, theme, t, blur)
             elif effect == "mesh":
                 self._draw_wire(light, pr_all, p2, r, theme, t, lw)
-            elif effect == "led":
-                self._draw_led(panel, light, pr_all, p2, r, theme, t, k, lw, shift, w, h)
             else:
                 self._draw_surface(panel, pr_all, p2, r, effect, theme, t)
             if hover is not None:
                 info = self._hover(p2_all, r, hover, px)
 
-        return Frame(self._composite(panel, light, px), rx0, ry0, w, h, r, info)
+        image = self._composite(panel, light, px)
+        for o in overlays:
+            o.draw_projected(image, lambda pts: (lambda q: (q[0] - shift, q[1]))(project_cm(pts)),
+                             k / CAMERA_DIST / self._scale_cm, t, theme)
+        if mode == "mask":
+            from n0face import glitch
+            from n0face.app import motion
+
+            if glitch.config.enabled and not motion.reduced_motion():
+                box = (int(x0) - rx0, int(y0) - ry0, int(x1) - rx0, int(y1) - ry0)
+                glitch.apply(image, box, t, theme)
+        return Frame(image, rx0, ry0, w, h, r, info)
 
     @staticmethod
     def _composite(panel: np.ndarray, light: np.ndarray, px: float) -> np.ndarray:
@@ -296,46 +284,18 @@ class MaskScene:
         idx = np.nonzero(facing)[0]
         return idx[np.argsort(depth[idx])]
 
-    def _draw_led(self, panel, light, pr, p2, r, theme, t, k, lw, shift, w, h):
+    def _skin_backing(self, panel, pr, p2, r):
+        """The generic face in neutral skin tones, blurred like a real face under a mask."""
+        from n0face.designs import blur_backing
+
         facing = self._facing(self.tri_normals, self.tri_centers, r)
         shade = self._shade(self.tri_normals, r)
-        g = (10 + 14 * shade).astype(np.int32)
-        a = 240 / 255
-        colors = np.stack([g * a, g * a, (g + 2) * a, np.full_like(g, 240)], axis=1).astype(np.int32)
+        colors = np.c_[SKIN[None] * shade[:, None], np.full(len(shade), 255)].astype(np.int32)
         self._fill_faces(panel, np.round(p2[self.tris]).astype(np.int32), colors, self._visible_order(pr, facing))
-
-        # Expression: blink every ~4 s, a short "o" mouth every ~7 s, otherwise a smile.
-        blink = (t % 4.0) < 0.14
-        talk = (t % 7.0) < 0.6
-        x, y = self.led_points[:, 0], self.led_points[:, 1]
-        lit = np.zeros(len(x), bool)
-        line = 0.6 * self.led_pitch
-        a_eye = 0.3 * self.iod
-        b_eye = line if blink else a_eye * 0.8
-        for c in self.led_eyes:
-            lit |= ((x - c[0]) / a_eye) ** 2 + ((y - c[1]) / b_eye) ** 2 <= 1
-        cx, cy, a_m = self.led_mouth
-        if talk:
-            lit |= ((x - cx) / (a_m * 0.55)) ** 2 + ((y - cy) / (a_m * 0.5)) ** 2 <= 1
-        else:
-            u = np.clip((x - cx) / a_m, -1, 1)
-            curve = cy - 0.25 * self.iod * (1 - u**2) + 0.08 * self.iod
-            lit |= (np.abs(x - cx) <= a_m) & (np.abs(y - curve) <= line)
-
-        vis = facing[self.led_tri]
-        _, d2 = project_points(self.led_points, r, w, h, k)
-        d2 = np.round(d2 - shift).astype(np.int32)
-        radius = max(int(k / CAMERA_DIST * self.led_pitch * 0.34), 1)
-        color = theme.accent if talk else theme.primary
-        dim = _premul(DIM_DOT, 255)
-        circle = cv2.circle
-        for pt in d2[vis & ~lit].tolist():
-            circle(panel, pt, radius, dim, -1, cv2.LINE_AA)
-        for pt in d2[vis & lit].tolist():
-            circle(light, pt, radius, color, -1, cv2.LINE_AA)
+        blur_backing(panel, cv2.extractChannel(panel, 3))
 
     def _texture_design(self, effect: str, theme: Theme) -> str | None:
-        """The wrap texture this effect shows in the preview, if it's drawn as a texture."""
+        """The design this effect shows in the preview, if it's drawn as one."""
         from n0face import wrap
 
         fx = self._effect(effect, theme)
@@ -343,10 +303,10 @@ class MaskScene:
             return fx.wrap_design
         return None
 
-    def _draw_texture(self, panel, pr, p2, r, k, shift, w, h, design, theme, t):
-        """The same textured masks the live pipeline draws: wrapped on the 3D face when 3D WRAP
+    def _draw_texture(self, panel, pr, p2, r, k, shift, w, h, design, theme, t, blur=False):
+        """The same mask designs the live pipeline draws: wrapped on the 3D face when 3D WRAP
         is on, otherwise a flat card that turns with the head."""
-        from n0face import wrap
+        from n0face import designs, wrap
 
         m = wrap.mesh()
         if wrap.config.enabled:
@@ -358,7 +318,7 @@ class MaskScene:
             card_r, card_2d = project_points(card, r, w, h, k)
             pts, near = card_2d - shift, card_r[:, 2]
             normals = np.tile(np.array([0.0, 0.0, 1.0]) @ r.T, (len(card), 1))
-        wrap.draw_design(panel, pts, normals, near, design, theme, t, lambda: wrap.animated_expression(t))
+        designs.draw_design(panel, pts, normals, near, design, theme, t, lambda: wrap.animated_expression(t), blur)
 
     def _effect(self, name: str, theme: Theme):
         key = (name, theme)

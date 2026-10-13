@@ -21,7 +21,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 bench = ["psutil>=5.9"]
-gpu = ["moderngl>=5.8"]
 
 [project.scripts]
 n0face-cli = "n0face.cli:main"

@@ -58,13 +58,16 @@ def _excepthook(exc_type, exc, tb) -> None:
         _show_error(f"Unexpected error: {exc}", details)
 
 
-def build_window():
+def build_window(load_plugins: bool = True):
     """Create the detector, engine and main window. Raises on failure."""
+    from n0face import plugins
     from n0face.app.window import MainWindow
     from n0face.detector import FaceDetector
     from n0face.netguard import lock_network
     from n0face.pipeline import Engine
 
+    if load_plugins:
+        plugins.load()
     detector = FaceDetector()
     # The model is loaded and nothing else needs the network: turn it off for this process.
     lock_network()
