@@ -1,0 +1,29 @@
+# n0face
+
+> Free, open-source Windows app for local face privacy. It masks, blurs or anonymizes faces live on your webcam (as a virtual camera for Discord, Zoom, Microsoft Teams, Google Meet and OBS) and in photos and videos. Everything runs on-device: no cloud, no account, no telemetry.
+
+## What it does
+
+- Live face masks on your webcam: MESH (a 3D wireframe) and X (purge-style X eyes and a stitched grin), with an optional GLITCH effect.
+- Three privacy modes: MASK (decorative, shows expressions), OBFUSCATE (glitch blocks, static or pixelation over the face), ANONYMIZE (covers the whole head; the strongest).
+- Masks or blurs faces in photos and videos and strips EXIF/GPS metadata from the copies. Originals are never changed.
+- Fail-closed: if face tracking drops for more than a few frames, the whole frame is hidden.
+- Useful for faceless streaming and faceless YouTube/TikTok/Twitch content, and as a privacy-focused Snap Camera alternative.
+
+## Limits (stated honestly)
+
+- No mode makes a person unidentifiable: voice, body, clothing, room and speech can still identify someone.
+- Windows 10/11 only. The virtual camera needs OBS Studio installed (for its driver).
+- Video processing is slow: roughly 10x the video's length.
+
+## Pricing
+
+- Free and open source (AGPL-3.0), including every privacy feature.
+- n0face PRO (optional, cosmetic, coming soon): five more masks, 3D accessories, per-element colors and part swapping, glitch tuning.
+
+## Links
+
+- Website: https://n0face.pages.dev/
+- Download (Windows installer): https://github.com/kaloyanstefanov66/n0face/releases/latest
+- Source code: https://github.com/kaloyanstefanov66/n0face
+- Privacy and threat model: https://github.com/kaloyanstefanov66/n0face/blob/main/docs/PRIVACY.md
