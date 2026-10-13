@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>n0face: go live without your face</title>
+  <meta name="description" content="Free, open-source Windows app that swaps your face for a mask on your webcam, photos and videos. Runs on your PC: no cloud, no accounts, no telemetry.">
+  <meta name="theme-color" content="#050705">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="n0face: go live without your face">
+  <meta property="og:description" content="Swap your face for a mask on your webcam, photos and videos. Local only: no cloud, no accounts, no telemetry.">
+  <meta property="og:image" content="https://kaloyanstefanov66.github.io/n0face/assets/og.png">
+  <meta property="og:url" content="https://kaloyanstefanov66.github.io/n0face/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="assets/sedgwick.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "n0face",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Windows 10, Windows 11",
+    "softwareVersion": "0.2.1",
+    "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+    "downloadUrl": "https://github.com/kaloyanstefanov66/n0face/releases/latest",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "description": "Local-only face masking and anonymization for your webcam, photos and videos."
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" data-nav>
+    <div class="wrap nav__row">
+      <a class="nav__brand" href="#top" aria-label="n0face home">
+        <img src="assets/wordmark.png" width="600" height="165" alt="n0face">
+      </a>
+      <nav class="nav__links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#masks">Masks</a>
+        <a href="#modes">Modes</a>
+        <a href="#privacy">Privacy</a>
+      </nav>
+      <div class="nav__actions">
+        <a class="icon-link" href="https://github.com/kaloyanstefanov66/n0face" aria-label="Source code on GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        </a>
+        <a class="btn btn--sm" href="https://github.com/kaloyanstefanov66/n0face/releases/latest">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO ------------------------------------------------------------------------------>
+    <section class="hero" id="top">
+      <div class="hero__grid" aria-hidden="true"></div>
+      <div class="hero__glow" aria-hidden="true"></div>
+
+      <div class="wrap hero__copy">
+        <p class="pill reveal"><span class="dot"></span> v0.2.1 &nbsp;·&nbsp; free for Windows</p>
+        <h1 class="reveal">Go live<br><span class="hero__accent" data-glitch="without your face.">without your face.</span></h1>
+        <p class="lede reveal">n0face swaps your face for a mask on your webcam, photos and videos, live, on your own PC.
+          No cloud. No accounts. No telemetry.</p>
+        <div class="cta reveal">
+          <a class="btn btn--lg" href="https://github.com/kaloyanstefanov66/n0face/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.1 10.4 4v7.1H3V5.1Zm0 13.8 7.4 1.1v-7.1H3v6Zm8.2 1.2L21 21.5v-8.6h-9.8v7.2Zm0-16.2v7.3H21V2.5l-9.8 1.4Z"/></svg>
+            Download for Windows
+          </a>
+          <a class="btn btn--ghost btn--lg" href="https://github.com/kaloyanstefanov66/n0face">View the source <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="fine reveal">Open source (AGPL-3.0) &nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; 98 MB</p>
+      </div>
+
+      <div class="stage reveal" aria-hidden="true">
+        <canvas class="stage__canvas" data-face></canvas>
+        <span class="tag">privacy is a choice</span>
+        <div class="chip chip--a"><span class="dot"></span><b>FACE LOCKED</b><i>478 pts</i></div>
+        <div class="chip chip--b"><span class="dot"></span><b>PROCESSING</b><i>local</i></div>
+        <div class="chip chip--c"><span class="dot dot--off"></span><b>UPLOADED</b><i>0 bytes</i></div>
+        <div class="chip chip--d"><span class="dot"></span><b>VIRTUAL CAM</b><i>on</i></div>
+      </div>
+      <p class="sr-only">Animation: a 3D face mesh rotates while a scan line turns it into redacted blocks.</p>
+    </section>
+
+    <!-- WORKS WITH ------------------------------------------------------------------------>
+    <section class="works" aria-label="Works with">
+      <div class="wrap works__row">
+        <span class="label">Shows up as a camera in</span>
+        <ul>
+          <li>Discord</li><li>Zoom</li><li>Teams</li><li>Google Meet</li><li>OBS</li><li>Twitch</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- HOW --------------------------------------------------------------------------------->
+    <section class="section" id="how">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span>[01]</span> How it works <i aria-hidden="true">////////</i></p>
+        <h2 class="reveal">Three steps. All of them on your machine.</h2>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step__n">01</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 16V6h10M32 6h10v10M42 32v10H32M16 42H6V32"/><circle cx="18" cy="21" r="1.6"/><circle cx="30" cy="21" r="1.6"/><path d="M18 31c3.5 2.5 8.5 2.5 12 0"/></svg>
+            <h3>Detect</h3>
+            <p>An on-device model finds 478 points on your face. A second one keeps track of your head when you look down or turn away.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">02</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 6c9 0 15 7 15 17 0 11-7 19-15 19S9 34 9 23C9 13 15 6 24 6Z"/><path d="m16 19 6 6m0-6-6 6m10-6 6 6m0-6-6 6M17 33l2 2 2-2 2 2 2-2 2 2 2-2 2 2"/></svg>
+            <h3>Replace</h3>
+            <p>Your face becomes a mask that follows your expressions, a glitch, or a full-head cover. Lose tracking and the frame goes dark until you're found again.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">03</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="12" width="28" height="24" rx="2"/><path d="m33 21 10-6v18l-10-6"/><path d="M12 30h4m4 0h6"/></svg>
+            <h3>Go live</h3>
+            <p>Pick the n0face camera in Discord, Zoom or OBS. Or drop in photos and videos and get masked copies with the metadata stripped.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- MASKS ------------------------------------------------------------------------------>
+    <section class="section section--masks" id="masks">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span>[02]</span> Masks <i aria-hidden="true">////////</i></p>
+        <h2 class="reveal">Drawn on your face in 3D.<br><span class="muted">Sharp at any angle.</span></h2>
+
+        <div class="masks">
+          <figure class="mask reveal">
+            <img src="assets/mask-mesh.webp" width="720" height="720" loading="lazy" alt="The MESH mask: a glowing green wireframe of a face.">
+            <figcaption><b>MESH</b><span>A holographic wireframe that tracks every expression.</span></figcaption>
+          </figure>
+          <figure class="mask reveal">
+            <img src="assets/mask-x.webp" width="720" height="720" loading="lazy" alt="The X mask: spray-painted X eyes and a stitched grin on a black mask.">
+            <figcaption><b>X</b><span>Spray-paint X eyes and a stitched grin that follows your smile.</span></figcaption>
+          </figure>
+          <figure class="mask reveal">
+            <div class="glitchArt" data-glitch-art role="img" aria-label="The X mask torn by a GLITCH burst."></div>
+            <figcaption><b class="glitch-word" data-glitch="+ GLITCH">+ GLITCH</b><span>Random bursts that tear and warp the mask. Works with any mask.</span></figcaption>
+          </figure>
+        </div>
+        <p class="masks__note reveal">Under every mask: <b>BLUR</b> (a heavy blur of your face) or <b>SOLID</b> (hidden completely).</p>
+
+        <div class="pro reveal">
+          <div class="pro__copy">
+            <h3>n0face PRO <span class="muted">· optional</span></h3>
+            <p>Five more masks, accessories that ride on your head in 3D, and full customization. Cosmetic only: everything that protects you stays free. Buying it funds development and code signing.</p>
+            <a class="link" href="https://github.com/kaloyanstefanov66/n0face#n0face-pro">About PRO →</a>
+          </div>
+          <ul class="pro__strip">
+            <li><img src="assets/extras/led.webp" width="220" height="220" loading="lazy" alt="LED mask"></li>
+            <li><img src="assets/extras/circuit.webp" width="220" height="220" loading="lazy" alt="CIRCUIT mask"></li>
+            <li><img src="assets/extras/hex.webp" width="220" height="220" loading="lazy" alt="HEX mask"></li>
+            <li><img src="assets/extras/skull.webp" width="220" height="220" loading="lazy" alt="SKULL mask"></li>
+            <li><img src="assets/extras/wireframe.webp" width="220" height="220" loading="lazy" alt="WIREFRAME mask"></li>
+            <li><img src="assets/extras/horns.webp" width="220" height="220" loading="lazy" alt="Horns accessory"></li>
+            <li><img src="assets/extras/crown.webp" width="220" height="220" loading="lazy" alt="Crown accessory"></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODES ------------------------------------------------------------------------------>
+    <section class="section" id="modes">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span>[03]</span> Modes <i aria-hidden="true">////////</i></p>
+        <h2 class="reveal">Pick how hidden you need to be.</h2>
+        <p class="lede lede--left reveal">We'll be straight with you: no mode makes you unidentifiable. Your voice, body and room can still give you away. Here's exactly what each one does.</p>
+
+        <div class="modes">
+          <article class="modeCard reveal">
+            <header><span class="modeCard__k">01</span><h3>MASK</h3><span class="badge badge--warn">Decorative</span></header>
+            <p>Stylized masks over a blur of your face, or a solid backing. Shows your expressions.</p>
+            <p class="modeCard__no"><b>Doesn't hide</b> your facial geometry or expressions.</p>
+          </article>
+          <article class="modeCard reveal">
+            <header><span class="modeCard__k">02</span><h3>OBFUSCATE</h3><span class="badge">Hides your face</span></header>
+            <p>Replaces your face pixels with glitch blocks or static, generated from scratch.</p>
+            <p class="modeCard__no"><b>Doesn't hide</b> face outline, hair, ears, body or background.</p>
+          </article>
+          <article class="modeCard modeCard--max reveal">
+            <header><span class="modeCard__k">03</span><h3>ANONYMIZE</h3><span class="badge badge--max">Strongest</span></header>
+            <p>Covers your whole head with a shape-hiding cover and holds it longer when tracking drops.</p>
+            <p class="modeCard__no"><b>Doesn't hide</b> body, voice, background or anything you say.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRIVACY ---------------------------------------------------------------------------->
+    <section class="section" id="privacy">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span>[04]</span> Privacy <i aria-hidden="true">////////</i></p>
+        <h2 class="reveal">Private by construction,<br><span class="muted">not by promise.</span></h2>
+
+        <figure class="shot reveal">
+          <img src="assets/app.webp" width="1875" height="1175" loading="lazy" alt="The n0face app: a 3D preview of the X mask, with mode and effect settings on the right.">
+        </figure>
+
+        <ul class="facts">
+          <li class="reveal"><h3>On-device</h3><p>Detection runs on your CPU. Frames never leave your PC.</p></li>
+          <li class="reveal"><h3>Network off</h3><p>Once the model loads, n0face switches its own networking off.</p></li>
+          <li class="reveal"><h3>Fail-closed</h3><p>If tracking drops for more than a few frames, the whole frame is hidden.</p></li>
+          <li class="reveal"><h3>No recording</h3><p>Live camera frames are never written to disk.</p></li>
+          <li class="reveal"><h3>Metadata stripped</h3><p>Masked copies of photos and videos carry no EXIF or GPS. Originals are never changed.</p></li>
+          <li class="reveal"><h3>Open source</h3><p>Every line is on GitHub under AGPL-3.0. Read it, build it yourself.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -------------------------------------------------------------------------->
+    <section class="final">
+      <div class="final__glow" aria-hidden="true"></div>
+      <div class="wrap final__inner">
+        <h2 class="reveal">Your face.<br><span class="hero__accent">Your data.</span></h2>
+        <div class="cta reveal">
+          <a class="btn btn--lg" href="https://github.com/kaloyanstefanov66/n0face/releases/latest">Download n0face for Windows</a>
+        </div>
+        <ul class="notes reveal">
+          <li>The installer isn't code-signed yet. If Windows warns you, click <b>More info → Run anyway</b>, or check the SHA-256 in the release notes first.</li>
+          <li>To use n0face as a camera in other apps, also install free <a class="link" href="https://obsproject.com/">OBS Studio</a> (it provides the virtual camera driver).</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__row">
+      <img src="assets/wordmark.png" width="600" height="165" alt="n0face" class="footer__mark" loading="lazy">
+      <nav aria-label="Footer">
+        <a href="https://github.com/kaloyanstefanov66/n0face">GitHub</a>
+        <a href="https://github.com/kaloyanstefanov66/n0face/releases">Releases</a>
+        <a href="https://github.com/kaloyanstefanov66/n0face/blob/main/docs/PRIVACY.md">Threat model</a>
+        <a href="https://github.com/kaloyanstefanov66/n0face/blob/main/LICENSE">License</a>
+      </nav>
+      <p class="footer__fine">This site loads nothing from third parties: no analytics, no cookies, no tracking fonts.</p>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
