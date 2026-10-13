@@ -249,10 +249,15 @@
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
 
-  fetch("assets/face.json")
-    .then((r) => r.json())
-    .then(start)
-    .catch(() => {}); // the page works without it
+  if (window.N0FACE_FACE) {
+    try {
+      start(window.N0FACE_FACE);
+    } catch (e) {
+      console.error("n0face: the hero face failed to start", e);
+    }
+  } else {
+    console.warn("n0face: assets/face.js didn't load; the hero face is off");
+  }
 
   function start(data) {
     const V = Float32Array.from(data.v);
@@ -281,7 +286,7 @@
       tint = document.createElement("canvas");
       buf.width = tint.width = W;
       buf.height = tint.height = H;
-      if (reduced) frame(0.4);
+      safeFrame(reduced ? 0.4 : clock()); // resizing clears the canvas: redraw now, not next frame
     };
     new ResizeObserver(resize).observe(canvas);
 
@@ -355,6 +360,17 @@
     };
 
     let lastHeadline = -10;
+    const t0 = performance.now();
+    const clock = () => (performance.now() - t0) / 1000;
+    let failed = false;
+    function safeFrame(t) {
+      try {
+        frame(t);
+      } catch (e) {
+        if (!failed) console.error("n0face: hero frame failed", e);
+        failed = true;
+      }
+    }
 
     function frame(t) {
       if (!W || !H) return;
@@ -502,9 +518,8 @@
     resize();
     if (reduced) return;
     let running = false, raf = 0;
-    const t0 = performance.now();
-    const loop = (now) => {
-      frame((now - t0) / 1000);
+    const loop = () => {
+      safeFrame(clock());
       raf = requestAnimationFrame(loop);
     };
     const set = (on) => {
