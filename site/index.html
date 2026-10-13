@@ -45,6 +45,7 @@
         <a href="#masks">Masks</a>
         <a href="#modes">Modes</a>
         <a href="#privacy">Privacy</a>
+        <a href="#plans">Plans</a>
       </nav>
       <div class="nav__actions">
         <a class="icon-link" href="https://github.com/kaloyanstefanov66/n0face" aria-label="Source code on GitHub">
@@ -58,8 +59,9 @@
   <main id="main">
     <!-- HERO ------------------------------------------------------------------------------>
     <section class="hero" id="top">
-      <div class="hero__grid" aria-hidden="true"></div>
+      <canvas class="bg" data-bg aria-hidden="true"></canvas>
       <div class="hero__glow" aria-hidden="true"></div>
+      <div class="beam" aria-hidden="true"></div>
 
       <div class="wrap hero__copy">
         <p class="pill reveal"><span class="dot"></span> v0.2.1 &nbsp;·&nbsp; free for Windows</p>
@@ -84,7 +86,7 @@
         <div class="chip chip--c"><span class="dot dot--off"></span><b>UPLOADED</b><i>0 bytes</i></div>
         <div class="chip chip--d"><span class="dot"></span><b>VIRTUAL CAM</b><i>on</i></div>
       </div>
-      <p class="sr-only">Animation: a 3D face mesh rotates while a scan line turns it into redacted blocks.</p>
+      <p class="sr-only">Animation: the X mask on a rotating 3D face, torn now and then by glitch bursts.</p>
     </section>
 
     <!-- WORKS WITH ------------------------------------------------------------------------>
@@ -151,7 +153,7 @@
           <div class="pro__copy">
             <h3>n0face PRO <span class="muted">· optional</span></h3>
             <p>Five more masks, accessories that ride on your head in 3D, and full customization. Cosmetic only: everything that protects you stays free. Buying it funds development and code signing.</p>
-            <a class="link" href="https://github.com/kaloyanstefanov66/n0face#n0face-pro">About PRO →</a>
+            <a class="link" href="#plans">Compare plans →</a>
           </div>
           <ul class="pro__strip">
             <li><img src="assets/extras/led.webp" width="220" height="220" loading="lazy" alt="LED mask"></li>
@@ -214,8 +216,64 @@
       </div>
     </section>
 
+    <!-- PLANS ------------------------------------------------------------------------------>
+    <section class="section" id="plans">
+      <div class="wrap">
+        <p class="eyebrow reveal"><span>[05]</span> Plans <i aria-hidden="true">////////</i></p>
+        <h2 class="reveal">Free forever.<br><span class="hero__accent">PRO if you want the drip.</span></h2>
+        <p class="lede lede--left reveal">Everything that protects you is free, and always will be. PRO is cosmetic: more masks,
+          accessories and full customization. Buying it pays for development and the code-signing certificate
+          that gets rid of the Windows warning for everyone.</p>
+
+        <div class="plans">
+          <article class="plan reveal">
+            <header class="plan__head">
+              <h3>FREE</h3>
+              <p class="plan__price"><b>$0</b><span>forever</span></p>
+              <p class="plan__sub">Everything you need to hide your face.</p>
+            </header>
+            <ul class="plan__list">
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>MESH</b> and <b>X</b> masks</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>GLITCH</b> bursts</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span>All three privacy modes: mask, obfuscate, anonymize</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span>Virtual camera for Discord, Zoom, Teams and OBS</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span>Photos and videos, with metadata stripped</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>BLUR</b> or <b>SOLID</b> under the mask</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span>Open source (AGPL-3.0), no account</span></li>
+            </ul>
+            <a class="btn btn--ghost btn--lg plan__cta" href="https://github.com/kaloyanstefanov66/n0face/releases/latest">Download free</a>
+          </article>
+
+          <article class="plan plan--pro reveal">
+            <div class="plan__fan" aria-hidden="true">
+              <img src="assets/extras/skull.webp" width="220" height="220" alt="">
+              <img src="assets/extras/horns.webp" width="220" height="220" alt="">
+              <img src="assets/extras/led.webp" width="220" height="220" alt="">
+              <img src="assets/extras/crown.webp" width="220" height="220" alt="">
+              <img src="assets/extras/wireframe.webp" width="220" height="220" alt="">
+            </div>
+            <header class="plan__head">
+              <h3>PRO <span class="badge badge--max">Coming soon</span></h3>
+              <p class="plan__price"><b>One-time</b><span>no subscription</span></p>
+              <p class="plan__sub">Everything in Free, plus:</p>
+            </header>
+            <ul class="plan__list">
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>5 more masks:</b> LED, CIRCUIT, HEX, SKULL, WIREFRAME</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>7 accessories</b> that ride on your head in 3D: horns, halo, crown, ears, spikes, antenna, shades</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>Recolour every part</b> of a mask: eyes, mouth, lines, accent, base</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>Swap X parts:</b> slit, dot, heart or spiral eyes; teeth, smile or zipper mouths</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>Tune the paint:</b> stroke, glow, drips</span></li>
+              <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3 3 7-7"/></svg><span><b>GLITCH controls:</b> intensity, frequency, length</span></li>
+            </ul>
+            <a class="btn btn--lg plan__cta" href="https://github.com/kaloyanstefanov66/n0face#n0face-pro">Get PRO <span aria-hidden="true">→</span></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <!-- FINAL CTA -------------------------------------------------------------------------->
     <section class="final">
+      <canvas class="bg bg--final" data-bg aria-hidden="true"></canvas>
       <div class="final__glow" aria-hidden="true"></div>
       <div class="wrap final__inner">
         <h2 class="reveal">Your face.<br><span class="hero__accent">Your data.</span></h2>

@@ -43,8 +43,40 @@ def face_json() -> None:
         "v": [round(float(x), 3) for x in v.ravel()],
         "t": [int(i) for i in tris.ravel()],
         "e": [int(i) for i in face.edges.ravel()],
+        **x_design(v),
     }
+    from n0face import wrap
+
+    assert np.array_equal(tris, wrap.mesh().tris), "the X anchors index wrap.mesh() triangles"
     (OUT / "face.json").write_text(json.dumps(data, separators=(",", ":")))
+
+
+def x_design(v: np.ndarray) -> dict:
+    """The X mask's strokes, pinned to mesh triangles exactly as the app pins them, for the three
+    stop-motion "boil" frames. Each polyline is flat [triangle, w1, w2, ...] (w0 = 1 - w1 - w2);
+    triangle indices refer to wrap.mesh().tris."""
+    from n0face import designs, wrap
+
+    m = wrap.mesh()
+    boils = []
+    for boil in range(3):
+        groups = designs._x_shapes(1.0, 1.0, 0.35, 0.0, boil)
+        out = []
+        for polys in groups:
+            lines = []
+            for poly in polys:
+                anc = designs.anchor(poly)
+                flat = []
+                for tri, b in zip(anc.tri, anc.bary):
+                    flat += [int(tri), round(float(b[1]), 3), round(float(b[2]), 3)]
+                lines.append(flat)
+            out.append(lines)
+        boils.append(out)
+    # texels -> mesh units, so stroke widths (given in texels) scale with the face
+    uv, tris = m.uv * designs.TEX, m.tris
+    e3 = sum(np.linalg.norm(v[tris[:, i]] - v[tris[:, (i + 1) % 3]], axis=1).sum() for i in range(3))
+    e2 = sum(np.linalg.norm(uv[tris[:, i]] - uv[tris[:, (i + 1) % 3]], axis=1).sum() for i in range(3))
+    return {"x": boils, "k": round(float(e3 / e2), 6)}
 
 
 def mask_renders() -> None:
