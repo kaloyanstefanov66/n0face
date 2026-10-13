@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "n0face"
-version = "0.2.0"
+version = "0.2.1"
 description = "Local-only face masking and anonymization for your webcam, published as a virtual camera."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
