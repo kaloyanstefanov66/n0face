@@ -23,7 +23,7 @@
 
 ## Links
 
-- Website: https://n0face.pages.dev/
-- Download (Windows installer): https://github.com/kaloyanstefanov66/n0face/releases/latest
-- Source code: https://github.com/kaloyanstefanov66/n0face
-- Privacy and threat model: https://github.com/kaloyanstefanov66/n0face/blob/main/docs/PRIVACY.md
+- [Website](https://n0face.pages.dev/): features, privacy modes, plans and FAQ
+- [Download for Windows](https://github.com/kaloyanstefanov66/n0face/releases/latest): latest installer and release notes
+- [Source code](https://github.com/kaloyanstefanov66/n0face): AGPL-3.0, with build instructions
+- [Privacy and threat model](https://github.com/kaloyanstefanov66/n0face/blob/main/docs/PRIVACY.md): what n0face does and doesn't protect

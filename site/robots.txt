@@ -20,4 +20,22 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
 Sitemap: https://n0face.pages.dev/sitemap.xml
